@@ -1,0 +1,5 @@
+# Local agent planning — plans and status stay on this machine.
+# .cursor/rules/ is committed so every agent is told to read those plans.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
