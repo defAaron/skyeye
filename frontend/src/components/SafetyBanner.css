@@ -1,0 +1,44 @@
+.safety-banner {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  background: #f5a524;
+  border-bottom: 3px solid #b91c1c;
+  color: #1a1206;
+}
+
+.safety-banner__mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #b91c1c;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.safety-banner__text {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .safety-banner {
+    align-items: flex-start;
+  }
+
+  .safety-banner__text {
+    font-size: 0.875rem;
+  }
+}

@@ -3,3 +3,37 @@
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Model weights (never commit; downloaded or trained locally)
+*.pt
+*.pth
+*.onnx
+*.engine
+
+# Datasets and fixture image blobs (licensed research data stays local)
+backend/fixtures/images/*
+!backend/fixtures/images/.gitkeep
+datasets/
+runs/
+
+# Node
+node_modules/
+dist/
+*.local
+
+# OS / editor
+.DS_Store
+*.swp

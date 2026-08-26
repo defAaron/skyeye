@@ -1,0 +1,75 @@
+.overlay {
+  margin-top: 0.875rem;
+}
+
+.overlay__frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #05070a;
+  border-radius: 6px;
+  /* Inset shadow rather than a border: a border would make aspect-ratio apply to the
+     border box while the SVG fills the content box, shifting boxes by ~1 px. */
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.overlay__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Sized by the frame, coordinates by the viewBox, so pixel bboxes land correctly
+   at any rendered width without JS scale math. */
+.overlay__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.box {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.box__rect {
+  fill: color-mix(in srgb, #4c9aff 12%, transparent);
+  stroke: #4c9aff;
+  stroke-width: 2;
+}
+
+.box:hover .box__rect,
+.box--active .box__rect {
+  fill: color-mix(in srgb, #f5a524 22%, transparent);
+  stroke: #f5a524;
+  stroke-width: 3;
+}
+
+.box__reticle {
+  fill: none;
+  stroke: #f5a524;
+  stroke-width: 1;
+  stroke-dasharray: 6 5;
+  opacity: 0.85;
+}
+
+.overlay__tag {
+  position: absolute;
+  transform: translate(0, -100%);
+  padding: 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #05070a;
+  background: #4c9aff;
+  border-radius: 3px 3px 0 0;
+  pointer-events: none;
+}
+
+.overlay__tag--active {
+  background: #f5a524;
+}
