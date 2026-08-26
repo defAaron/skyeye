@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 import { getHealth, SkyEyeApiError } from './api/client'
 import DetectPanel from './components/DetectPanel'
 import SafetyBanner from './components/SafetyBanner'
-import type { HealthResponse } from './types'
+import SearchArea from './components/SearchArea'
+import SearchMap from './components/SearchMap'
+import type { DetectResponse, GeocodeResponse, HealthResponse } from './types'
 
 type HealthState =
   | { status: 'loading' }
@@ -12,6 +14,10 @@ type HealthState =
 
 export default function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'loading' })
+  const [searchArea, setSearchArea] = useState<GeocodeResponse | null>(null)
+  const [detectResult, setDetectResult] = useState<DetectResponse | null>(null)
+  const [hoveredId, setHoveredId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -38,6 +44,21 @@ export default function App() {
     }
   }, [])
 
+  const onResults = useCallback((result: DetectResponse | null) => {
+    setDetectResult(result)
+    setHoveredId(null)
+    setPinnedId(null)
+  }, [])
+
+  const onSelect = useCallback((id: string) => {
+    setPinnedId((current) => (current === id ? null : id))
+  }, [])
+
+  const activeId = hoveredId ?? pinnedId
+  const origin = searchArea ? { lat: searchArea.lat, lng: searchArea.lng } : null
+  const geocodeConfigured =
+    health.status === 'online' ? health.health.geocode?.configured ?? false : null
+
   return (
     <>
       <SafetyBanner />
@@ -59,7 +80,9 @@ export default function App() {
               Detection runs on drone-altitude photographs, not satellite or map tiles.
               Public satellite imagery resolves at roughly 30–50 cm per pixel, which
               renders a person as 1–2 pixels — far too little signal for any detector to
-              work with. SkyEye therefore never treats map tiles as detector input.
+              work with. SkyEye therefore never treats map tiles as detector input. The
+              map below is for last-known location, a search ring, and reviewing
+              projected candidate pins.
             </p>
           </section>
 
@@ -102,6 +125,14 @@ export default function App() {
                         : 'not yet — loads lazily on first detection'}
                     </dd>
                   </div>
+                  <div className="facts__row">
+                    <dt>Geocoding</dt>
+                    <dd>
+                      {health.health.geocode?.configured
+                        ? 'configured'
+                        : 'not configured'}
+                    </dd>
+                  </div>
                 </dl>
               </>
             )}
@@ -122,7 +153,29 @@ export default function App() {
             )}
           </section>
 
-          <DetectPanel health={health.status === 'online' ? health.health : null} />
+          <SearchArea
+            geocodeConfigured={geocodeConfigured}
+            searchArea={searchArea}
+            disabled={false}
+            onGeocoded={setSearchArea}
+          />
+
+          <SearchMap
+            searchArea={searchArea}
+            detections={detectResult?.detections ?? []}
+            activeId={activeId}
+            onHover={setHoveredId}
+            onSelect={onSelect}
+          />
+
+          <DetectPanel
+            health={health.status === 'online' ? health.health : null}
+            origin={origin}
+            activeId={activeId}
+            onHover={setHoveredId}
+            onSelect={onSelect}
+            onResults={onResults}
+          />
         </main>
       </div>
     </>

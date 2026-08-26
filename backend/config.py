@@ -13,7 +13,7 @@ FIXTURES_DIR = BACKEND_DIR / "fixtures"
 FIXTURE_IMAGES_DIR = FIXTURES_DIR / "images"
 MANIFEST_PATH = FIXTURES_DIR / "manifest.json"
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -47,6 +47,13 @@ class Settings:
     max_image_pixels: int = field(default_factory=lambda: _int("MAX_IMAGE_PIXELS", 40_000_000))
 
     allowed_mime_types: tuple[str, ...] = ("image/jpeg", "image/png")
+    google_maps_api_key: str = field(
+        default_factory=lambda: (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
+    )
+
+    @property
+    def geocode_configured(self) -> bool:
+        return bool(self.google_maps_api_key)
 
     @property
     def weights_label(self) -> str:

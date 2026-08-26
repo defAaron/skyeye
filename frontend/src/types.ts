@@ -10,6 +10,9 @@ export interface HealthResponse {
     weights: string
     device: string
   }
+  geocode: {
+    configured: boolean
+  }
   limits: {
     max_upload_bytes: number
     max_image_pixels: number
@@ -33,6 +36,14 @@ export interface Sample {
   attribution: string
   expected_min_detections: number
   image_url: string
+  /** Null when the fixture is not tagged to a map location. */
+  geo: SampleGeo | null
+}
+
+export interface SampleGeo {
+  center_lat: number
+  center_lng: number
+  demo_placement: boolean
 }
 
 export interface SamplesResponse {
@@ -47,9 +58,8 @@ export interface Detection {
   bbox_xyxy: BBoxXYXY
   confidence: number
   class_name: string
-  /** Reserved for the later geocoding layer; always null in this phase. */
+  /** WGS84 when the sample is georeferenced; otherwise null. Always null for uploads. */
   lat: number | null
-  /** Reserved for the later geocoding layer; always null in this phase. */
   lng: number | null
 }
 
@@ -64,8 +74,43 @@ export interface DetectResponse {
     conf_threshold: number
     inference_ms: number
     model: string
+    geo: DetectGeo | null
   }
   disclaimer: string
+}
+
+export interface DetectGeo {
+  center_lat: number
+  center_lng: number
+  gsd_m: number
+  heading_deg: number
+  demo_placement: boolean
+}
+
+export type LpbCategory =
+  | 'child'
+  | 'youth'
+  | 'elderly'
+  | 'elderly_hiker'
+  | 'dementia'
+  | 'hiker'
+  | 'hunter'
+  | 'unknown'
+
+export interface GeocodeRequest {
+  location_text: string
+  elapsed_hours: number
+  category: LpbCategory
+}
+
+export interface GeocodeResponse {
+  lat: number
+  lng: number
+  formatted_address: string
+  radius_m: number
+  category: LpbCategory
+  elapsed_hours: number
+  lpb_note: string
 }
 
 export type ApiErrorCode =
@@ -78,6 +123,13 @@ export type ApiErrorCode =
   | 'IMAGE_TOO_LARGE'
   | 'INFERENCE_FAILED'
   | 'MODEL_UNAVAILABLE'
+  | 'EMPTY_LOCATION'
+  | 'LOCATION_TOO_LONG'
+  | 'INVALID_ELAPSED_HOURS'
+  | 'UNKNOWN_CATEGORY'
+  | 'GEOCODE_NOT_FOUND'
+  | 'GEOCODE_FAILED'
+  | 'GEOCODE_UNAVAILABLE'
 
 export interface ApiError {
   error: {

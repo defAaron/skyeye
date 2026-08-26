@@ -4,7 +4,8 @@
     "Every image is a public, openly licensed drone/aerial photograph taken at drone altitude (nadir or near-nadir). No satellite tiles, no live surveillance, no private footage.",
     "Purpose-built SAR datasets (HERIDAL, SARD, C2A) are access-gated behind request forms or Kaggle auth, so this corpus stands in for them: openly licensed nadir drone photos where humans occupy only a few dozen pixels — the same detection difficulty.",
     "Image blobs are gitignored. Run 'python fixtures/fetch_fixtures.py' from backend/ to download them.",
-    "expected_min_detections is a human-eyeballed floor used by the smoke test, not ground-truth annotation."
+    "expected_min_detections is a human-eyeballed floor used by the smoke test, not ground-truth annotation.",
+    "Three wilderness/lawn fixtures carry a geo.demo_placement tag on the Bruce Trail / Milton conservation area so detections can be reviewed on the map. That is a demo overlay, not the photograph's real capture location."
   ],
   "samples": [
     {
@@ -21,7 +22,15 @@
       "commons_title": "File:Assigned Spaces (Unsplash).jpg",
       "license": "CC0",
       "attribution": "Cameron Venti via Unsplash",
-      "why_included": "Closest analogue to a real SAR subject: one immobile person, prone, viewed straight down against open ground."
+      "why_included": "Closest analogue to a real SAR subject: one immobile person, prone, viewed straight down against open ground.",
+      "geo": {
+        "center_lat": 43.5094,
+        "center_lng": -79.9518,
+        "gsd_m": 0.15,
+        "heading_deg": 0,
+        "demo_placement": true,
+        "placement_note": "Demo flyover tagged to the Bruce Trail / Milton conservation area. This photograph was not captured here."
+      }
     },
     {
       "id": "lone_surfer_shorebreak",
@@ -118,7 +127,15 @@
       "commons_title": "File:Forest clearing from above (Unsplash).jpg",
       "license": "CC0",
       "attribution": "Geran de Klerk via Unsplash",
-      "why_included": "True negative over exactly the terrain a wilderness search flies. Branches and stumps are the classic false-positive trap."
+      "why_included": "True negative over exactly the terrain a wilderness search flies. Branches and stumps are the classic false-positive trap.",
+      "geo": {
+        "center_lat": 43.5131,
+        "center_lng": -79.9622,
+        "gsd_m": 0.15,
+        "heading_deg": 0,
+        "demo_placement": true,
+        "placement_note": "Demo flyover tagged to the Bruce Trail / Milton conservation area. This photograph was not captured here."
+      }
     },
     {
       "id": "wooded_valley_canopy",
@@ -134,7 +151,15 @@
       "commons_title": "File:Aerial view of forest canopy and waterfall, Sitakunda Eco Park⁠.jpg",
       "license": "CC BY-SA 4.0",
       "attribution": "See the Commons file page for the required author credit",
-      "why_included": "Second true negative, and an honest reminder that closed canopy hides a subject from any optical sensor."
+      "why_included": "Second true negative, and an honest reminder that closed canopy hides a subject from any optical sensor.",
+      "geo": {
+        "center_lat": 43.5058,
+        "center_lng": -79.9564,
+        "gsd_m": 0.15,
+        "heading_deg": 0,
+        "demo_placement": true,
+        "placement_note": "Demo flyover tagged to the Bruce Trail / Milton conservation area. This photograph was not captured here."
+      }
     }
   ]
 }

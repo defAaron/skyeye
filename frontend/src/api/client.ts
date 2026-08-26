@@ -2,6 +2,8 @@ import type {
   ApiError,
   ApiErrorCode,
   DetectResponse,
+  GeocodeRequest,
+  GeocodeResponse,
   HealthResponse,
   SamplesResponse,
 } from '../types'
@@ -83,6 +85,38 @@ export function getHealth(): Promise<HealthResponse> {
 
 export function getSamples(): Promise<SamplesResponse> {
   return request<SamplesResponse>('/api/samples')
+}
+
+export const GEOCODE_TIMEOUT_MS = 15_000
+
+export async function postGeocode(body: GeocodeRequest): Promise<GeocodeResponse> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), GEOCODE_TIMEOUT_MS)
+  try {
+    let response: Response
+    try {
+      response = await fetch('/api/geocode', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+    } catch {
+      if (controller.signal.aborted) {
+        throw new SkyEyeApiError(
+          'TIMEOUT',
+          'Geocoding took too long and was stopped.',
+        )
+      }
+      throw new SkyEyeApiError(
+        'NETWORK_ERROR',
+        'Could not reach the SkyEye backend. Is it running on port 5001?',
+      )
+    }
+    return await unwrap<GeocodeResponse>(response)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Tiled CPU inference on a large frame routinely runs tens of seconds. */

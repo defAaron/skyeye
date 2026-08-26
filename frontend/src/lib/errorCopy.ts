@@ -57,6 +57,41 @@ const COPY: Record<string, ErrorCopy> = {
     hint: 'The model weights are still being prepared on the server. No image can be assessed until they are ready.',
     retryable: true,
   },
+  EMPTY_LOCATION: {
+    title: 'No location was given',
+    hint: 'Describe a last-known place — a trail name, park, or town — then geocode again.',
+    retryable: false,
+  },
+  LOCATION_TOO_LONG: {
+    title: 'That location description is too long',
+    hint: 'Shorten it to a place name or address of at most 200 characters.',
+    retryable: false,
+  },
+  INVALID_ELAPSED_HOURS: {
+    title: 'Elapsed time is out of range',
+    hint: 'Use a number of hours between 0.1 and 72.',
+    retryable: false,
+  },
+  UNKNOWN_CATEGORY: {
+    title: 'That subject category is not recognised',
+    hint: 'Pick one of the Lost Person Behavior categories in the list.',
+    retryable: false,
+  },
+  GEOCODE_NOT_FOUND: {
+    title: 'No map location matched that description',
+    hint: 'Try a more specific place name, or add the town or region.',
+    retryable: true,
+  },
+  GEOCODE_FAILED: {
+    title: 'Geocoding could not be completed',
+    hint: 'The geocoding provider did not return a usable result. Try again in a moment.',
+    retryable: true,
+  },
+  GEOCODE_UNAVAILABLE: {
+    title: 'Geocoding is not available',
+    hint: 'The backend has no Maps key, or the Geocoding API is not enabled for it. Detection still works without a map.',
+    retryable: true,
+  },
   TIMEOUT: {
     title: 'The detection run took too long and was stopped',
     hint: 'Tiled inference on the CPU is slow on very large images. Nothing was assessed. Try again, or submit a smaller image.',

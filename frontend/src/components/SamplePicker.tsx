@@ -52,6 +52,9 @@ export default function SamplePicker({
                   {sample.width} × {sample.height} px
                 </span>
                 <span className="sample__terrain">{sample.terrain}</span>
+                {sample.geo && (
+                  <span className="sample__geo">demo map tag</span>
+                )}
               </span>
             </button>
           </li>

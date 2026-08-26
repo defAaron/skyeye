@@ -9,6 +9,7 @@ import {
 import { describeError } from '../lib/errorCopy'
 import { formatBytes, formatPercent, formatSeconds, safeHttpUrl } from '../lib/format'
 import type { DetectResponse, HealthResponse, Sample } from '../types'
+import type { LatLng } from '../lib/geo'
 import DetectionList from './DetectionList'
 import DetectionOverlay from './DetectionOverlay'
 import SamplePicker from './SamplePicker'
@@ -54,9 +55,21 @@ type RunState =
 
 interface DetectPanelProps {
   health: HealthResponse | null
+  origin: LatLng | null
+  activeId: string | null
+  onHover: (id: string | null) => void
+  onSelect: (id: string) => void
+  onResults: (result: DetectResponse | null) => void
 }
 
-export default function DetectPanel({ health }: DetectPanelProps) {
+export default function DetectPanel({
+  health,
+  origin,
+  activeId,
+  onHover,
+  onSelect,
+  onResults,
+}: DetectPanelProps) {
   const [samplesState, setSamplesState] = useState<SamplesState>({ status: 'loading' })
   const [selectedSample, setSelectedSample] = useState<Sample | null>(null)
   const [upload, setUpload] = useState<{ file: File; previewUrl: string } | null>(null)
@@ -64,8 +77,6 @@ export default function DetectPanel({ health }: DetectPanelProps) {
   const [conf, setConf] = useState(DEFAULT_CONF)
   const [run, setRun] = useState<RunState>({ status: 'idle' })
   const [tick, setTick] = useState(0)
-  const [hoveredId, setHoveredId] = useState<string | null>(null)
-  const [pinnedId, setPinnedId] = useState<string | null>(null)
 
   const abortRef = useRef<AbortController | null>(null)
   const objectUrlsRef = useRef<string[]>([])
@@ -111,12 +122,12 @@ export default function DetectPanel({ health }: DetectPanelProps) {
     const controller = new AbortController()
     abortRef.current = controller
     setRun({ status: 'running', startedAt: Date.now() })
-    setHoveredId(null)
-    setPinnedId(null)
+    onResults(null)
 
     try {
       const result = await postDetect({ ...request, signal: controller.signal })
       setRun({ status: 'done', result, subject })
+      onResults(result)
     } catch (error: unknown) {
       const code = error instanceof SkyEyeApiError ? error.code : 'BAD_RESPONSE'
       const message =
@@ -127,7 +138,7 @@ export default function DetectPanel({ health }: DetectPanelProps) {
     } finally {
       abortRef.current = null
     }
-  }, [])
+  }, [onResults])
 
   function chooseSample(sample: Sample) {
     setInputError(null)
@@ -183,7 +194,6 @@ export default function DetectPanel({ health }: DetectPanelProps) {
       : ''
   const hasInput = Boolean(selectedSample || upload)
   const running = run.status === 'running'
-  const activeId = hoveredId ?? pinnedId
   const errorCopy = run.status === 'error' ? describeError(run.code) : null
 
   return (
@@ -398,9 +408,10 @@ export default function DetectPanel({ health }: DetectPanelProps) {
         <ResultsCard
           result={run.result}
           subject={run.subject}
+          origin={origin}
           activeId={activeId}
-          onHover={setHoveredId}
-          onSelect={(id) => setPinnedId((current) => (current === id ? null : id))}
+          onHover={onHover}
+          onSelect={onSelect}
         />
       )}
     </>
@@ -410,6 +421,7 @@ export default function DetectPanel({ health }: DetectPanelProps) {
 interface ResultsCardProps {
   result: DetectResponse
   subject: Subject
+  origin: LatLng | null
   activeId: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
@@ -418,6 +430,7 @@ interface ResultsCardProps {
 function ResultsCard({
   result,
   subject,
+  origin,
   activeId,
   onHover,
   onSelect,
@@ -471,6 +484,7 @@ function ResultsCard({
           <DetectionList
             detections={detections}
             activeId={activeId}
+            origin={origin}
             onHover={onHover}
             onSelect={onSelect}
           />
@@ -479,6 +493,15 @@ function ResultsCard({
             your local SAR coordinator — they decide what happens next.
           </p>
         </>
+      )}
+
+      {result.meta.geo?.demo_placement && (
+        <p className="notice notice--empty">
+          Map pins for this sample are a <strong>demo placement</strong> on the Bruce
+          Trail / Milton conservation area. This photograph was not captured there.
+          Pixel boxes are projected with an assumed ground sample distance so they can
+          be reviewed on the map — they are not GPS from an aircraft.
+        </p>
       )}
 
       <p className="disclaimer" role="note">

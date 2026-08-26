@@ -1,6 +1,7 @@
 import './DetectionList.css'
 import { formatPercent } from '../lib/format'
 import type { Detection } from '../types'
+import { formatOffset, type LatLng } from '../lib/geo'
 
 interface DetectionListProps {
   /** Already ranked by confidence descending by the API; never re-sorted here. */
@@ -8,6 +9,7 @@ interface DetectionListProps {
   activeId: string | null
   onHover: (id: string | null) => void
   onSelect: (id: string) => void
+  origin: LatLng | null
 }
 
 export default function DetectionList({
@@ -15,6 +17,7 @@ export default function DetectionList({
   activeId,
   onHover,
   onSelect,
+  origin,
 }: DetectionListProps) {
   return (
     <ol className="candidates" aria-label="Candidates ranked by confidence, highest first">
@@ -50,6 +53,13 @@ export default function DetectionList({
                   <span>
                     Box size: {x2 - x1} × {y2 - y1} px
                   </span>
+                  {origin &&
+                    detection.lat !== null &&
+                    detection.lng !== null && (
+                      <span>
+                        {formatOffset(origin, { lat: detection.lat, lng: detection.lng })}
+                      </span>
+                    )}
                 </span>
                 <span className="candidate__note">
                   Person-shaped candidate. Requires human verification.

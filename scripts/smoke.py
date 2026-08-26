@@ -6,8 +6,9 @@ Run against a live backend (defaults to the dev port):
     backend/venv/bin/python scripts/smoke.py --base-url http://127.0.0.1:5001
 
 Checks the contract in docs/api-contract.md: health, sample listing, sample image
-serving, error handling, and detection on both an obvious-person fixture and a
-true negative. Exits non-zero if any check fails.
+serving, error handling, detection on both an obvious-person fixture and a
+true negative, geocode validation, LPB radius, and live geocode when configured.
+Exits non-zero if any check fails.
 """
 
 from __future__ import annotations
@@ -112,6 +113,27 @@ def post_multipart(url: str, fields: dict, files: dict, timeout: int = 600):
         return 0, {"error": {"code": "UNREACHABLE", "message": str(exc.reason)}}
 
 
+def post_json(url: str, payload: dict, timeout: int = 30) -> tuple[int, dict]:
+    body = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        raw = exc.read()
+        try:
+            return exc.code, json.loads(raw)
+        except json.JSONDecodeError:
+            return exc.code, {"raw": raw[:200].decode("utf-8", "replace")}
+    except urllib.error.URLError as exc:
+        return 0, {"error": {"code": "UNREACHABLE", "message": str(exc.reason)}}
+
+
 def png_header_only(width: int, height: int) -> bytes:
     """Signature + IHDR + IEND: a tiny file declaring an enormous canvas.
 
@@ -131,7 +153,7 @@ def png_header_only(width: int, height: int) -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IEND", b"")
 
 
-def check_detection_shape(report: Report, label: str, payload: dict) -> bool:
+def check_detection_shape(report: Report, label: str, payload: dict, *, expect_geo: bool = False) -> bool:
     ok = True
     for key in ("image_width", "image_height", "detections", "meta", "disclaimer"):
         ok &= report.add(key in payload, f"{label}: response has '{key}'")
@@ -149,10 +171,24 @@ def check_detection_shape(report: Report, label: str, payload: dict) -> bool:
             f"{label}: class_name is 'person'",
             str(detection.get("class_name")),
         )
+        lat, lng = detection.get("lat"), detection.get("lng")
+        both_null = lat is None and lng is None
+        both_num = isinstance(lat, (int, float)) and isinstance(lng, (int, float))
         ok &= report.add(
-            detection.get("lat") is None and detection.get("lng") is None,
-            f"{label}: lat/lng are null this phase",
+            both_null or both_num,
+            f"{label}: lat/lng both null or both numbers",
+            f"lat={lat} lng={lng}",
         )
+        if expect_geo:
+            ok &= report.add(
+                both_num,
+                f"{label}: georeferenced sample fills lat/lng",
+            )
+        else:
+            ok &= report.add(
+                both_null,
+                f"{label}: untagged sample keeps lat/lng null",
+            )
         bbox = detection.get("bbox_xyxy") or []
         ok &= report.add(
             len(bbox) == 4
@@ -190,6 +226,17 @@ def main() -> int:
     report.add(health.get("status") == "ok", "status is 'ok'")
     report.add("limits" in health, "limits block present")
     report.add(
+        isinstance(health.get("geocode"), dict) and "configured" in health["geocode"],
+        "geocode.configured present",
+        str(health.get("geocode")),
+    )
+    geocode_configured = bool((health.get("geocode") or {}).get("configured"))
+    health_blob = json.dumps(health).lower()
+    report.add(
+        "aiza" not in health_blob and "api_key" not in health_blob,
+        "health payload does not leak a maps key",
+    )
+    report.add(
         isinstance(health.get("model", {}).get("weights"), str),
         "model weights reported",
         str(health.get("model", {}).get("weights")),
@@ -212,6 +259,7 @@ def main() -> int:
         report.add(status == 200, "sample image serves 200", str(status))
         report.add(content_type.startswith("image/"), "sample image content-type", content_type)
         report.add(size > 0, "sample image has bytes", f"{size / 1_000_000:.1f} MB")
+        report.add("geo" in first, "sample objects include geo (null or object)")
 
     print("\n[3] Error handling")
     status, body = get_json(f"{base}/api/samples/definitely-not-a-sample/image")
@@ -263,7 +311,14 @@ def main() -> int:
         elapsed = time.perf_counter() - started
         report.add(status == 200, f"detect on '{obvious['id']}' returns 200", str(status))
         if status == 200:
-            check_detection_shape(report, obvious["id"], payload)
+            expect_geo = obvious.get("geo") is not None
+            check_detection_shape(report, obvious["id"], payload, expect_geo=expect_geo)
+            report.add(
+                (payload.get("meta") or {}).get("geo") is not None
+                if expect_geo
+                else (payload.get("meta") or {}).get("geo") is None,
+                f"{obvious['id']}: meta.geo matches fixture tagging",
+            )
             found = len(payload.get("detections", []))
             minimum = obvious.get("expected_min_detections", 1)
             report.add(
@@ -288,7 +343,14 @@ def main() -> int:
         elapsed = time.perf_counter() - started
         report.add(status == 200, f"detect on '{negative['id']}' returns 200", str(status))
         if status == 200:
-            check_detection_shape(report, negative["id"], payload)
+            expect_geo = negative.get("geo") is not None
+            check_detection_shape(report, negative["id"], payload, expect_geo=expect_geo)
+            report.add(
+                (payload.get("meta") or {}).get("geo") is not None
+                if expect_geo
+                else (payload.get("meta") or {}).get("geo") is None,
+                f"{negative['id']}: meta.geo matches fixture tagging",
+            )
             found = len(payload.get("detections", []))
             top = max((d["confidence"] for d in payload.get("detections", [])), default=0.0)
             # A true negative may still surface low-confidence clutter; that is honest
@@ -318,6 +380,12 @@ def main() -> int:
                 payload.get("meta", {}).get("sample_id") is None,
                 "meta.sample_id is null for uploads",
             )
+            report.add(
+                payload.get("meta", {}).get("geo") is None,
+                "uploads do not get geo",
+            )
+            if payload.get("detections"):
+                check_detection_shape(report, "upload", payload, expect_geo=False)
         status, body = post_multipart(
             f"{base}/api/detect",
             {"sample_id": samples[0]["id"] if samples else "x"},
@@ -331,6 +399,98 @@ def main() -> int:
         )
     else:
         report.add(False, f"upload fixture present ({upload_source.name})")
+
+    print("\n[7] Geocode + LPB")
+    sys.path.insert(0, str(REPO_ROOT / "backend"))
+    from geo.lpb import radius_m
+    from geo.project import bbox_center_latlng
+
+    report.add(
+        radius_m("elderly_hiker", 4.5) == 1347,
+        "LPB radius for elderly_hiker at 4.5h is 1347 m",
+        str(radius_m("elderly_hiker", 4.5)),
+    )
+    center_lat, center_lng = bbox_center_latlng(
+        [0, 0, 100, 100],
+        100,
+        100,
+        {"center_lat": 43.5, "center_lng": -79.9, "gsd_m": 0.15, "heading_deg": 0},
+    )
+    report.add(
+        center_lat == 43.5 and center_lng == -79.9,
+        "bbox at image centre projects to geo centre",
+        f"{center_lat},{center_lng}",
+    )
+
+    status, body = post_json(f"{base}/api/geocode", {})
+    report.add(status == 400, "geocode with empty body returns 400", str(status))
+    report.add(
+        body.get("error", {}).get("code") == "EMPTY_LOCATION",
+        "error code is EMPTY_LOCATION",
+        str(body.get("error", {}).get("code")),
+    )
+    status, body = post_json(
+        f"{base}/api/geocode",
+        {"location_text": "Bruce Trail, Milton", "elapsed_hours": 4.5, "category": "not-a-category"},
+    )
+    report.add(status == 400, "unknown category returns 400", str(status))
+    report.add(
+        body.get("error", {}).get("code") == "UNKNOWN_CATEGORY",
+        "error code is UNKNOWN_CATEGORY",
+        str(body.get("error", {}).get("code")),
+    )
+    status, body = post_json(
+        f"{base}/api/geocode",
+        {"location_text": "x", "elapsed_hours": 99, "category": "hiker"},
+    )
+    report.add(
+        status == 400 and body.get("error", {}).get("code") == "INVALID_ELAPSED_HOURS",
+        "out-of-range elapsed_hours returns 400",
+        str(body.get("error", {}).get("code")),
+    )
+
+    if geocode_configured:
+        status, body = post_json(
+            f"{base}/api/geocode",
+            {
+                "location_text": "Bruce Trail, Milton, Ontario",
+                "elapsed_hours": 4.5,
+                "category": "elderly_hiker",
+            },
+        )
+        report.add(status == 200, "live geocode of Milton returns 200", str(status))
+        if status == 200:
+            report.add(
+                isinstance(body.get("lat"), (int, float)) and isinstance(body.get("lng"), (int, float)),
+                "geocode returns numeric lat/lng",
+                f"{body.get('lat')},{body.get('lng')}",
+            )
+            report.add(body.get("radius_m") == 1347, "live radius matches LPB table", str(body.get("radius_m")))
+            report.add(bool(body.get("formatted_address")), "formatted_address present")
+            report.add(bool(body.get("lpb_note")), "lpb_note present")
+            blob = json.dumps(body).lower()
+            report.add("aiza" not in blob, "geocode response does not leak a maps key")
+            # Milton / Halton is roughly 43.4–43.6 N, 79.8–80.1 W
+            lat, lng = body.get("lat"), body.get("lng")
+            report.add(
+                isinstance(lat, (int, float)) and 43.3 < lat < 43.7 and -80.2 < lng < -79.6,
+                "geocoded point is in the Milton / Niagara Escarpment area",
+                f"{lat},{lng}",
+            )
+    else:
+        status, body = post_json(
+            f"{base}/api/geocode",
+            {
+                "location_text": "Bruce Trail, Milton, Ontario",
+                "elapsed_hours": 4.5,
+                "category": "elderly_hiker",
+            },
+        )
+        report.add(
+            status == 503 and body.get("error", {}).get("code") == "GEOCODE_UNAVAILABLE",
+            "missing key returns 503 GEOCODE_UNAVAILABLE",
+            f"{status} {body.get('error', {}).get('code')}",
+        )
 
     total = len(report.rows)
     failures = report.failures

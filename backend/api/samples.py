@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, send_file
 
 from api.errors import ApiError
 from config import FIXTURE_IMAGES_DIR, MANIFEST_PATH
+from geo.project import public_geo
 
 bp = Blueprint("samples", __name__)
 
@@ -51,6 +52,7 @@ def _public_fields(entry: dict) -> dict:
         "attribution": entry.get("attribution"),
         "expected_min_detections": entry.get("expected_min_detections", 0),
         "image_url": f"/api/samples/{entry['id']}/image",
+        "geo": public_geo(entry),
     }
 
 

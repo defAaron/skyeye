@@ -8,17 +8,19 @@ SkyEye compresses the SAR triage pipeline: a vision model scans drone-altitude i
 
 ## What is built right now
 
-This repo currently implements the **core detection loop** only:
+This repo currently implements the **core detection loop** plus a **search-area map**:
 
-**image in → tiled YOLOv8 inference → ranked person-shaped candidates → human review in a testing UI**
+**image in → tiled YOLOv8 inference → ranked person-shaped candidates → human review**
 
-Deliberately **not** built yet: Google Maps, LLM free-text intake, geocoding, Lost Person Behavior search radius, globe view, video upload. The detection response already carries `lat` / `lng` fields (always `null` for now) so those can arrive as view layers rather than a pipeline rewrite. Full product vision lives in [docs/PRD_TRD.md](./docs/PRD_TRD.md).
+**last-known location → geocode → Lost Person Behavior radius → Google Map pins**
+
+Not built yet: LLM free-text intake, globe view, video upload. Detection still runs only on drone-altitude photographs. Map tiles are never detector input. Full product vision lives in [docs/PRD_TRD.md](./docs/PRD_TRD.md).
 
 ## The honest constraint, up front
 
 **Satellite and map tiles cannot resolve a person.** Commercial satellite imagery tops out around 30–50 cm/pixel, which makes a human 1–2 pixels — there is nothing for a detector to find. This is a well-known limit in remote sensing, not a bug here.
 
-So SkyEye decouples *where to look* from *what to look at*: detection runs exclusively on **drone-altitude photographs**, the altitude real SAR drones and the aerial research datasets operate at. Map tiles are never detector input. When mapping arrives, it will be for geocoding and search-area display only.
+So SkyEye decouples *where to look* from *what to look at*: detection runs exclusively on **drone-altitude photographs**, the altitude real SAR drones and the aerial research datasets operate at. Map tiles are a geocoding and display layer only. Three wilderness/lawn fixtures are **demo-placed** on the Bruce Trail / Milton conservation area so pins can be reviewed on the map — those photographs were not captured there, and the UI says so.
 
 ### Measured limits of the current model
 
@@ -33,12 +35,15 @@ Quote these numbers rather than implying the detector is better than it is:
 
 | Layer | Tool |
 |-------|------|
-| Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`) |
+| Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`) |
 | Detection | YOLOv8n via Ultralytics, sliding-window tiling + IoU/containment merge |
-| Frontend | Vite + React + TypeScript (no map SDK this phase) |
+| Geocoding | Google Maps Geocoding API (server-side) |
+| Map | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
+| Search radius | Simplified Lost Person Behavior 50th-percentile table |
+| Frontend | Vite + React + TypeScript |
 | Demo corpus | 8 openly licensed Wikimedia Commons drone photographs |
 
-No API keys are required for this phase.
+Maps keys are required for the search-area map. Detection still runs without them.
 
 ## Setup
 
@@ -51,7 +56,8 @@ cd backend
 python3.11 -m venv venv
 venv/bin/python -m pip install --upgrade pip
 venv/bin/python -m pip install -r requirements.txt
-cp .env.example .env          # optional; defaults are fine
+cp .env.example .env
+# Put GOOGLE_MAPS_API_KEY in backend/.env (Geocoding API, server-side). Never commit it.
 venv/bin/python fixtures/fetch_fixtures.py   # download the demo corpus (~32 MB)
 venv/bin/python app.py
 ```
@@ -64,16 +70,21 @@ In a second terminal:
 
 ```bash
 cd frontend
+cp .env.example .env.local
+# Put VITE_GOOGLE_MAPS_API_KEY in frontend/.env.local (Maps JS, browser).
+# Restrict that key to HTTP referrers: http://localhost:5173/*
 npm install
 npm run dev
 ```
 
 UI on **http://localhost:5173**, proxying `/api` to Flask.
 
+Enable **Geocoding API** and **Maps JavaScript API** on the same Google Cloud project. Prefer two restrictions: IP (or none, locally) on the server key, HTTP referrers on the browser key. A single unrestricted key works for a laptop demo and is a leak risk if the frontend is ever public.
+
 ## Verify the install
 
 ```bash
-backend/venv/bin/python scripts/smoke.py    # 44 contract + behaviour checks
+backend/venv/bin/python scripts/smoke.py    # contract + behaviour checks, including geocode
 backend/venv/bin/python scripts/bench.py    # per-fixture detection numbers
 ```
 
@@ -95,10 +106,11 @@ Prints the same JSON shape the API returns.
 ## 30-second demo script
 
 1. **Open the UI.** Point at the amber banner: every result is a lead to verify, never a confirmation. It cannot be dismissed.
-2. **Say the honest thing first** (10s): "Satellite imagery can't resolve a person — they're one or two pixels. So we detect on drone-altitude imagery, which is where SAR drones actually fly, and where this works."
-3. **Pick `Single person lying on a lawn`.** Hit Detect. One candidate returns at ~91% confidence in about 4 seconds, box tight on the person. Note the wording: *candidate*, with an explicit score.
-4. **Pick `Conifer stand and bare clearing`** — a true negative. Zero candidates. Read the empty state out loud: *"That is a statement about the detector, not about the ground. It does not mean nobody is there."* This is the credibility moment.
-5. **If asked "how well does it work?"** — give the real numbers from the limits section above, including the 60-pixel floor and the surfer that is never detected. Then say what fixes it: fine-tuning on HERIDAL/SARD, and thermal imagery for night search, since most SAR misses happen after dark.
+2. **Say the honest thing first** (10s): "Satellite imagery can't resolve a person — they're one or two pixels. So we detect on drone-altitude imagery, which is where SAR drones actually fly. The map is only for last-known location and a search ring."
+3. **Geocode the prefilled report.** Bruce Trail, Milton, 4.5 hours, elderly hiker. A last-known pin and an ~1.3 km Lost Person Behavior ring appear. Note it is a simplified 50th-percentile heuristic, not operational planning.
+4. **Pick `Single person lying on a lawn`.** Hit Detect. One candidate returns at ~91% confidence in about 4 seconds, box tight on the person. A numbered pin appears inside the ring. Read the demo-placement notice out loud: the photo is tagged here so it can be reviewed on the map — it was not captured in Milton.
+5. **Pick `Conifer stand and bare clearing`** — a true negative. Zero candidates. Read the empty state out loud: *"That is a statement about the detector, not about the ground. It does not mean nobody is there."* This is the credibility moment.
+6. **If asked "how well does it work?"** — give the real numbers from the limits section above, including the 60-pixel floor and the surfer that is never detected. Then say what fixes it: fine-tuning on HERIDAL/SARD, and thermal imagery for night search, since most SAR misses happen after dark.
 
 Optional, if there is time: `Busy beachfront` shows tiling and cross-tile merge doing real work on many small subjects.
 
@@ -106,13 +118,14 @@ Optional, if there is time: `Busy beachfront` shows tiling and cross-tile merge 
 
 ```
 frontend/                     Vite + React testing UI
-  src/components/             SafetyBanner, SamplePicker, UploadZone,
-                              DetectionOverlay, DetectionList
+  src/components/             SafetyBanner, SearchArea, SearchMap,
+                              SamplePicker, UploadZone, DetectionOverlay, DetectionList
   src/api/client.ts           typed fetch wrappers, 180s abort
 backend/
   app.py                      Flask app factory
   config.py                   env-backed settings
-  api/                        health, samples, detect, error shape
+  api/                        health, samples, detect, geocode, error shape
+  geo/                        LPB radius, Google geocoder, pixel→lat/lng
   detection/
     model.py                  lazy YOLO load, person-class filter
     tiling.py                 sliding window + box projection

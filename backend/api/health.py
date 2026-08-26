@@ -20,6 +20,7 @@ def health():
                 "weights": settings.weights_label,
                 "device": settings.device,
             },
+            "geocode": {"configured": settings.geocode_configured},
             "limits": settings.limits_payload(),
         }
     )

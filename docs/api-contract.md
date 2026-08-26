@@ -1,10 +1,10 @@
-# SkyEye API contract (core detection phase)
+# SkyEye API contract (core detection + search-area map)
 
-Frozen for the core build: **image in → ranked person-shaped candidates out → human review**.
+Frozen for this build: **image in → ranked person-shaped candidates out → human review**, plus **location text → geocode + LPB radius → map pins**.
 
-This document is the single source of truth for request/response shapes in this phase. No agent may change a shape here without editing this file in the same change. Map, LLM extraction, geocoding, and globe features are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md) for the later product vision.
+This document is the single source of truth for request/response shapes. No agent may change a shape here without editing this file in the same change. LLM extraction, globe view, and video upload are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md).
 
-**Imagery rule:** detection runs on drone-altitude photos. Satellite/map tiles cannot resolve a person (~30–50 cm/pixel makes a human 1–2 pixels), so they are never detector input.
+**Imagery rule:** detection runs on drone-altitude photos. Satellite/map tiles cannot resolve a person (~30–50 cm/pixel makes a human 1–2 pixels), so they are never detector input. Google Maps is a geocoding and display layer only.
 
 ---
 
@@ -20,7 +20,12 @@ skyeye/
 │   │   ├── __init__.py
 │   │   ├── health.py           # GET /api/health
 │   │   ├── samples.py          # GET /api/samples, GET /api/samples/<id>/image
-│   │   └── detect.py           # POST /api/detect
+│   │   ├── detect.py           # POST /api/detect
+│   │   └── geocode.py          # POST /api/geocode
+│   ├── geo/
+│   │   ├── lpb.py              # Lost Person Behavior radius table
+│   │   ├── geocoder.py         # Google Geocoding API client
+│   │   └── project.py          # pixel → lat/lng for georeferenced samples
 │   ├── detection/
 │   │   ├── __init__.py
 │   │   ├── model.py            # lazy YOLO load, person-class filter
@@ -52,10 +57,11 @@ Ownership (one agent per area per step): `backend/detection/` = ML, `backend/app
 
 - Base URL in dev: `http://127.0.0.1:5001`. The frontend calls relative `/api/*` and Vite proxies to it.
 - All responses are JSON, `Content-Type: application/json`, except sample image bytes.
-- Coordinates are **pixel space** on the submitted image, origin top-left, `[x_min, y_min, x_max, y_max]` as integers.
-- `lat` / `lng` exist on every detection and are **always `null`** in this phase. They are reserved for the later geocoding layer and must not be removed.
-- Detections are sorted by `confidence` descending. `id` is stable within one response (`d1`, `d2`, …).
+- Coordinates on the image are **pixel space**, origin top-left, `[x_min, y_min, x_max, y_max]` as integers.
+- `lat` / `lng` exist on every detection. They are WGS84 numbers when the submitted sample is georeferenced; otherwise both are `null`. They are always `null` for uploads. Both are numbers or both are `null` — never mixed.
+- Detections stay sorted by `confidence` descending. `id` is stable within one response (`d1`, `d2`, …).
 - Every detection response carries `disclaimer`. Clients must display it and must never render "found".
+- Google Maps / Geocoding API keys must never appear in responses, logs, or the git tree.
 
 ### Errors
 
@@ -71,11 +77,19 @@ All errors use one shape and never leak filesystem paths, stack traces, or confi
 | 400 | `AMBIGUOUS_INPUT` | Both `image` and `sample_id` supplied |
 | 400 | `UNSUPPORTED_TYPE` | Not JPEG or PNG |
 | 400 | `INVALID_IMAGE` | Bytes are not a decodable image |
+| 400 | `INVALID_CONF` | `conf` missing-as-invalid or outside `0.01`–`0.95` |
+| 400 | `EMPTY_LOCATION` | Geocode `location_text` missing or blank |
+| 400 | `LOCATION_TOO_LONG` | Geocode `location_text` exceeds 200 characters |
+| 400 | `INVALID_ELAPSED_HOURS` | `elapsed_hours` missing or outside `0.1`–`72` |
+| 400 | `UNKNOWN_CATEGORY` | `category` is not in the LPB table |
 | 404 | `SAMPLE_NOT_FOUND` | Unknown `sample_id` |
+| 404 | `GEOCODE_NOT_FOUND` | Google returned zero results for that text |
 | 413 | `FILE_TOO_LARGE` | Upload exceeds `MAX_UPLOAD_BYTES` |
 | 413 | `IMAGE_TOO_LARGE` | Decoded pixels exceed `MAX_IMAGE_PIXELS` |
 | 500 | `INFERENCE_FAILED` | Model load or inference error |
+| 502 | `GEOCODE_FAILED` | Geocoding provider error (no key leaked) |
 | 503 | `MODEL_UNAVAILABLE` | Weights missing / not yet downloaded |
+| 503 | `GEOCODE_UNAVAILABLE` | `GOOGLE_MAPS_API_KEY` unset, or provider denied the request |
 
 ---
 
@@ -86,8 +100,9 @@ Liveness plus enough capability info for the UI to warn early.
 ```json
 {
   "status": "ok",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "model": { "loaded": false, "weights": "yolov8n.pt", "device": "cpu" },
+  "geocode": { "configured": false },
   "limits": {
     "max_upload_bytes": 26214400,
     "max_image_pixels": 40000000,
@@ -96,7 +111,7 @@ Liveness plus enough capability info for the UI to warn early.
 }
 ```
 
-`model.loaded` is `false` until the first detect request warms the model (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth.
+`model.loaded` is `false` until the first detect request warms the model (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth. `geocode.configured` is `true` when `GOOGLE_MAPS_API_KEY` is non-empty — the key itself is never returned.
 
 ---
 
@@ -119,13 +134,20 @@ Lists the curated demo corpus from `backend/fixtures/manifest.json`. No filesyst
       "license": "CC0",
       "attribution": "Photographer name via Unsplash",
       "expected_min_detections": 1,
-      "image_url": "/api/samples/obvious_person_field/image"
+      "image_url": "/api/samples/obvious_person_field/image",
+      "geo": {
+        "center_lat": 43.5094,
+        "center_lng": -79.9518,
+        "demo_placement": true
+      }
     }
   ]
 }
 ```
 
 `scenario` is one of `obvious_person`, `cluttered`, `true_negative`. `expected_min_detections` is `0` for `true_negative` and drives the smoke test.
+
+`geo` is `null` when the fixture is not tagged to a map location. When present, `demo_placement` is `true` if the photograph was **not** captured at those coordinates — it is tagged there so detections can be reviewed on the map. Clients must not describe that as the photo’s real origin.
 
 `license`, `attribution`, and `source_url` are served because several fixtures are CC BY / CC BY-SA and the UI must be able to credit them. Only fixtures whose image file is present on disk are listed, so a clone that has not run the download script returns `{"samples": []}` rather than broken entries.
 
@@ -168,8 +190,8 @@ Returns the fixture bytes (`image/jpeg` or `image/png`) so the UI can display an
       "bbox_xyxy": [120, 40, 180, 160],
       "confidence": 0.78,
       "class_name": "person",
-      "lat": null,
-      "lng": null
+      "lat": 43.50951,
+      "lng": -79.95172
     }
   ],
   "meta": {
@@ -178,17 +200,64 @@ Returns the fixture bytes (`image/jpeg` or `image/png`) so the UI can display an
     "tiles": 42,
     "conf_threshold": 0.25,
     "inference_ms": 3120,
-    "model": "yolov8n.pt"
+    "model": "yolov8n.pt",
+    "geo": {
+      "center_lat": 43.5094,
+      "center_lng": -79.9518,
+      "gsd_m": 0.15,
+      "heading_deg": 0,
+      "demo_placement": true
+    }
   },
   "disclaimer": "SkyEye surfaces possible leads only. It does not confirm a person's location or safety. Contact 911 / local SAR immediately."
 }
 ```
 
-`detections` is `[]` for a true negative — that is a success, not an error. `meta.source` is `"upload"` or `"sample"`; `sample_id` is `null` for uploads.
+`detections` is `[]` for a true negative — that is a success, not an error. `meta.source` is `"upload"` or `"sample"`; `sample_id` is `null` for uploads. `meta.geo` is `null` when the image is not georeferenced (uploads, and fixtures without a `geo` block). When `demo_placement` is `true`, `lat`/`lng` are a map overlay for the demo, not GPS from the aircraft.
 
 ---
 
-## Environment variables (`backend/.env`, template in `backend/.env.example`)
+## `POST /api/geocode`
+
+`application/json`. Converts last-known-location text into a map center and a Lost Person Behavior search radius. Does **not** run detection.
+
+```json
+// Request
+{
+  "location_text": "Bruce Trail, Milton, Ontario",
+  "elapsed_hours": 4.5,
+  "category": "elderly_hiker"
+}
+```
+
+```json
+// Response 200
+{
+  "lat": 43.5085,
+  "lng": -79.9521,
+  "formatted_address": "Bruce Trail, Milton, ON, Canada",
+  "radius_m": 1347,
+  "category": "elderly_hiker",
+  "elapsed_hours": 4.5,
+  "lpb_note": "Simplified 50th-percentile Lost Person Behavior radius, scaled with elapsed time. Not a guarantee the subject is inside the ring."
+}
+```
+
+| Field | Rules |
+|-------|--------|
+| `location_text` | Required string, 1–200 characters after trim |
+| `elapsed_hours` | Required number, `0.1`–`72` |
+| `category` | Required. One of `child`, `youth`, `elderly`, `elderly_hiker`, `dementia`, `hiker`, `hunter`, `unknown` |
+
+Radius formula (frozen): `clip(p50_m[category] * sqrt(elapsed_hours / 3), 200, 8000)` meters. `p50_m` is a simplified Koester-style 50th-percentile table treated as the radius at 3 elapsed hours. This is a demo heuristic, not operational SAR planning.
+
+The backend calls Google Maps Geocoding API. The key never appears in the response. First result wins.
+
+---
+
+## Environment variables
+
+### Backend (`backend/.env`, template in `backend/.env.example`)
 
 | Var | Default | Purpose |
 |-----|---------|---------|
@@ -201,5 +270,12 @@ Returns the fixture bytes (`image/jpeg` or `image/png`) so the UI can display an
 | `TILE_OVERLAP` | `0.2` | Fractional tile overlap |
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |
 | `MAX_IMAGE_PIXELS` | `40000000` | 40 MP decoded-pixel cap |
+| `GOOGLE_MAPS_API_KEY` | _(empty)_ | Server-side Geocoding API. Never commit. |
 
-No secrets are needed in this phase. API keys (Gemini, Google Maps) belong to later phases and must never be committed.
+### Frontend (`frontend/.env.local`, template in `frontend/.env.example`)
+
+| Var | Purpose |
+|-----|---------|
+| `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API. Exposed to the browser by design. Restrict to HTTP referrers (`http://localhost:5173/*`). Never commit the real value. |
+
+API keys must never be committed. Gemini / Groq keys are still later-phase.
