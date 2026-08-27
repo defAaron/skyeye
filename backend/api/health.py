@@ -21,6 +21,11 @@ def health():
                 "device": settings.device,
             },
             "geocode": {"configured": settings.geocode_configured},
+            "extract": {
+                "configured": settings.extract_configured,
+                "gemini": settings.gemini_configured,
+                "groq": settings.groq_configured,
+            },
             "limits": settings.limits_payload(),
         }
     )

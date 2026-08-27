@@ -1,8 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import './SearchArea.css'
 import { postGeocode, SkyEyeApiError } from '../api/client'
 import { describeError } from '../lib/errorCopy'
-import type { GeocodeResponse, LpbCategory } from '../types'
+import type { ExtractResponse, GeocodeResponse, LpbCategory } from '../types'
 
 const CATEGORIES: { id: LpbCategory; label: string }[] = [
   { id: 'elderly_hiker', label: 'Elderly hiker' },
@@ -23,6 +23,7 @@ interface SearchAreaProps {
   geocodeConfigured: boolean | null
   searchArea: GeocodeResponse | null
   disabled: boolean
+  intake: ExtractResponse | null
   onGeocoded: (result: GeocodeResponse) => void
 }
 
@@ -30,6 +31,7 @@ export default function SearchArea({
   geocodeConfigured,
   searchArea,
   disabled,
+  intake,
   onGeocoded,
 }: SearchAreaProps) {
   const [location, setLocation] = useState(DEFAULT_LOCATION)
@@ -37,17 +39,16 @@ export default function SearchArea({
   const [category, setCategory] = useState<LpbCategory>(DEFAULT_CATEGORY)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<{ code: string; message: string } | null>(null)
+  const appliedIntake = useRef<ExtractResponse | null>(null)
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault()
-    const elapsed = Number(hours)
+  async function runGeocode(nextLocation: string, nextHours: number, nextCategory: LpbCategory) {
     setBusy(true)
     setError(null)
     try {
       const result = await postGeocode({
-        location_text: location,
-        elapsed_hours: elapsed,
-        category,
+        location_text: nextLocation,
+        elapsed_hours: nextHours,
+        category: nextCategory,
       })
       onGeocoded(result)
     } catch (caught: unknown) {
@@ -62,6 +63,23 @@ export default function SearchArea({
     }
   }
 
+  useEffect(() => {
+    if (!intake || intake === appliedIntake.current) return
+    appliedIntake.current = intake
+    setLocation(intake.location_text)
+    setHours(String(intake.elapsed_hours))
+    setCategory(intake.subject.category)
+    if (geocodeConfigured === false) return
+    void runGeocode(intake.location_text, intake.elapsed_hours, intake.subject.category)
+    // Auto-geocode once per successful extract. intake identity is the extract payload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intake])
+
+  async function onSubmit(event: FormEvent) {
+    event.preventDefault()
+    await runGeocode(location, Number(hours), category)
+  }
+
   const copy = error ? describeError(error.code) : null
   const unavailable = geocodeConfigured === false
 
@@ -72,9 +90,10 @@ export default function SearchArea({
       </h2>
       <p className="card__body">
         Geocode a last-known location and size a search ring from elapsed time and
-        subject category. This is a simplified Lost Person Behavior heuristic — it
-        does not confirm where anyone is, and it does not run detection. Map tiles
-        are never detector input.
+        subject category. Extracted fields above fill this form so you can review
+        them before (or after) geocoding. This is a simplified Lost Person Behavior
+        heuristic — it does not confirm where anyone is, and it does not run
+        detection. Map tiles are never detector input.
       </p>
 
       {unavailable && (

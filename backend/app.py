@@ -8,6 +8,7 @@ from PIL import Image
 
 from api.detect import bp as detect_bp
 from api.errors import register_error_handlers
+from api.extract import bp as extract_bp
 from api.geocode import bp as geocode_bp
 from api.health import bp as health_bp
 from api.samples import bp as samples_bp
@@ -28,6 +29,7 @@ def create_app() -> Flask:
     app.register_blueprint(samples_bp)
     app.register_blueprint(detect_bp)
     app.register_blueprint(geocode_bp)
+    app.register_blueprint(extract_bp)
     register_error_handlers(app)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")

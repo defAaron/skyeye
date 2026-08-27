@@ -1,0 +1,12 @@
+.intake-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.intake-form__textarea {
+  min-height: 8.5rem;
+  resize: vertical;
+  line-height: 1.45;
+}

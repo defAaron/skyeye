@@ -7,7 +7,8 @@ Run against a live backend (defaults to the dev port):
 
 Checks the contract in docs/api-contract.md: health, sample listing, sample image
 serving, error handling, detection on both an obvious-person fixture and a
-true negative, geocode validation, LPB radius, and live geocode when configured.
+true negative, geocode validation, LPB radius, live geocode when configured,
+extract validation, and live extract when configured.
 Exits non-zero if any check fails.
 """
 
@@ -231,10 +232,21 @@ def main() -> int:
         str(health.get("geocode")),
     )
     geocode_configured = bool((health.get("geocode") or {}).get("configured"))
+    report.add(
+        isinstance(health.get("extract"), dict)
+        and "configured" in health["extract"]
+        and "gemini" in health["extract"]
+        and "groq" in health["extract"],
+        "extract.configured/gemini/groq present",
+        str(health.get("extract")),
+    )
+    extract_configured = bool((health.get("extract") or {}).get("configured"))
     health_blob = json.dumps(health).lower()
     report.add(
-        "aiza" not in health_blob and "api_key" not in health_blob,
-        "health payload does not leak a maps key",
+        "aiza" not in health_blob
+        and "gsk_" not in health_blob
+        and "api_key" not in health_blob,
+        "health payload does not leak maps or LLM keys",
     )
     report.add(
         isinstance(health.get("model", {}).get("weights"), str),
@@ -489,6 +501,96 @@ def main() -> int:
         report.add(
             status == 503 and body.get("error", {}).get("code") == "GEOCODE_UNAVAILABLE",
             "missing key returns 503 GEOCODE_UNAVAILABLE",
+            f"{status} {body.get('error', {}).get('code')}",
+        )
+
+    print("\n[8] Extract")
+    from extract.normalize import ExtractNormalizeError, normalize
+
+    clipped = normalize(
+        {
+            "location_text": "  Bruce Trail, Milton  ",
+            "elapsed_hours": 99,
+            "subject": {"age": 70, "clothing": "red jacket", "category": "not-real"},
+            "terrain_hint": "wooded trail",
+        },
+        "gemini",
+    )
+    report.add(
+        clipped["elapsed_hours"] == 72.0,
+        "normalize clips elapsed_hours to 72",
+        str(clipped["elapsed_hours"]),
+    )
+    report.add(
+        clipped["subject"]["category"] == "unknown",
+        "normalize maps unknown category to unknown",
+    )
+    report.add(clipped["location_text"] == "Bruce Trail, Milton", "normalize trims location")
+    report.add(clipped["provider"] == "gemini", "normalize keeps provider")
+    report.add(bool(clipped["disclaimer"]), "normalize includes disclaimer")
+    try:
+        normalize({"location_text": "", "elapsed_hours": 4.5, "subject": {"category": "hiker"}}, "groq")
+        report.add(False, "empty location raises EXTRACT_INCOMPLETE")
+    except ExtractNormalizeError as exc:
+        report.add(
+            exc.code == "EXTRACT_INCOMPLETE",
+            "empty location raises EXTRACT_INCOMPLETE",
+            exc.code,
+        )
+
+    status, body = post_json(f"{base}/api/extract", {})
+    report.add(status == 400, "extract with empty body returns 400", str(status))
+    report.add(
+        body.get("error", {}).get("code") == "EMPTY_REPORT",
+        "error code is EMPTY_REPORT",
+        str(body.get("error", {}).get("code")),
+    )
+    status, body = post_json(f"{base}/api/extract", {"report_text": "x" * 4001})
+    report.add(
+        status == 400 and body.get("error", {}).get("code") == "REPORT_TOO_LONG",
+        "overlong report returns 400 REPORT_TOO_LONG",
+        str(body.get("error", {}).get("code")),
+    )
+
+    sample_report = (
+        "My dad went missing around 3pm near Bruce Trail, Milton. "
+        "He's 70, wearing a red jacket, last seen walking near the "
+        "conservation area entrance."
+    )
+    if extract_configured:
+        status, body = post_json(f"{base}/api/extract", {"report_text": sample_report}, timeout=45)
+        report.add(status == 200, "live extract of PRD report returns 200", str(status))
+        if status == 200:
+            location = str(body.get("location_text") or "").lower()
+            report.add(
+                "milton" in location or "bruce" in location,
+                "extracted location mentions Milton or Bruce Trail",
+                str(body.get("location_text")),
+            )
+            hours = body.get("elapsed_hours")
+            report.add(
+                isinstance(hours, (int, float)) and 0.1 <= hours <= 72,
+                "elapsed_hours is in range",
+                str(hours),
+            )
+            category = (body.get("subject") or {}).get("category")
+            report.add(
+                category in {"elderly_hiker", "elderly", "hiker", "unknown"},
+                "category is a plausible LPB value",
+                str(category),
+            )
+            report.add(body.get("provider") in {"gemini", "groq"}, "provider is gemini or groq")
+            report.add(bool(body.get("disclaimer")), "extract disclaimer present")
+            blob = json.dumps(body).lower()
+            report.add(
+                "aiza" not in blob and "gsk_" not in blob,
+                "extract response does not leak LLM keys",
+            )
+    else:
+        status, body = post_json(f"{base}/api/extract", {"report_text": sample_report})
+        report.add(
+            status == 503 and body.get("error", {}).get("code") == "EXTRACT_UNAVAILABLE",
+            "missing LLM keys returns 503 EXTRACT_UNAVAILABLE",
             f"{status} {body.get('error', {}).get('code')}",
         )
 

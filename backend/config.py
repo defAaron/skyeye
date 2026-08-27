@@ -13,7 +13,7 @@ FIXTURES_DIR = BACKEND_DIR / "fixtures"
 FIXTURE_IMAGES_DIR = FIXTURES_DIR / "images"
 MANIFEST_PATH = FIXTURES_DIR / "manifest.json"
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -50,10 +50,28 @@ class Settings:
     google_maps_api_key: str = field(
         default_factory=lambda: (os.environ.get("GOOGLE_MAPS_API_KEY") or "").strip()
     )
+    gemini_api_key: str = field(
+        default_factory=lambda: (os.environ.get("GEMINI_API_KEY") or "").strip()
+    )
+    groq_api_key: str = field(
+        default_factory=lambda: (os.environ.get("GROQ_API_KEY") or "").strip()
+    )
 
     @property
     def geocode_configured(self) -> bool:
         return bool(self.google_maps_api_key)
+
+    @property
+    def gemini_configured(self) -> bool:
+        return bool(self.gemini_api_key)
+
+    @property
+    def groq_configured(self) -> bool:
+        return bool(self.groq_api_key)
+
+    @property
+    def extract_configured(self) -> bool:
+        return self.gemini_configured or self.groq_configured
 
     @property
     def weights_label(self) -> str:

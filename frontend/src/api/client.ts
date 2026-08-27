@@ -2,6 +2,8 @@ import type {
   ApiError,
   ApiErrorCode,
   DetectResponse,
+  ExtractRequest,
+  ExtractResponse,
   GeocodeRequest,
   GeocodeResponse,
   HealthResponse,
@@ -85,6 +87,38 @@ export function getHealth(): Promise<HealthResponse> {
 
 export function getSamples(): Promise<SamplesResponse> {
   return request<SamplesResponse>('/api/samples')
+}
+
+export const EXTRACT_TIMEOUT_MS = 30_000
+
+export async function postExtract(body: ExtractRequest): Promise<ExtractResponse> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), EXTRACT_TIMEOUT_MS)
+  try {
+    let response: Response
+    try {
+      response = await fetch('/api/extract', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+    } catch {
+      if (controller.signal.aborted) {
+        throw new SkyEyeApiError(
+          'TIMEOUT',
+          'Report extraction took too long and was stopped.',
+        )
+      }
+      throw new SkyEyeApiError(
+        'NETWORK_ERROR',
+        'Could not reach the SkyEye backend. Is it running on port 5001?',
+      )
+    }
+    return await unwrap<ExtractResponse>(response)
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export const GEOCODE_TIMEOUT_MS = 15_000

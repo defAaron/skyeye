@@ -8,13 +8,13 @@ SkyEye compresses the SAR triage pipeline: a vision model scans drone-altitude i
 
 ## What is built right now
 
-This repo currently implements the **core detection loop** plus a **search-area map**:
+This repo currently implements the **core detection loop**, a **search-area map**, and **LLM report intake**:
+
+**free-text report → Gemini/Groq extract → last-known location → geocode → Lost Person Behavior radius → Google Map pins**
 
 **image in → tiled YOLOv8 inference → ranked person-shaped candidates → human review**
 
-**last-known location → geocode → Lost Person Behavior radius → Google Map pins**
-
-Not built yet: LLM free-text intake, globe view, video upload. Detection still runs only on drone-altitude photographs. Map tiles are never detector input. Full product vision lives in [docs/PRD_TRD.md](./docs/PRD_TRD.md).
+Not built yet: globe view, video upload. Detection still runs only on drone-altitude photographs. Map tiles are never detector input. Full product vision lives in [docs/PRD_TRD.md](./docs/PRD_TRD.md).
 
 ## The honest constraint, up front
 
@@ -35,15 +35,16 @@ Quote these numbers rather than implying the detector is better than it is:
 
 | Layer | Tool |
 |-------|------|
-| Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`) |
+| Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`, `/api/extract`) |
 | Detection | YOLOv8n via Ultralytics, sliding-window tiling + IoU/containment merge |
+| Intake | Gemini 2.0 Flash (primary), Groq Llama 3.1 8B Instant (fallback) |
 | Geocoding | Google Maps Geocoding API (server-side) |
 | Map | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
 | Search radius | Simplified Lost Person Behavior 50th-percentile table |
 | Frontend | Vite + React + TypeScript |
 | Demo corpus | 8 openly licensed Wikimedia Commons drone photographs |
 
-Maps keys are required for the search-area map. Detection still runs without them.
+Maps keys are required for the search-area map. Gemini or Groq is required for free-text extract. Detection still runs without either.
 
 ## Setup
 
@@ -58,6 +59,9 @@ venv/bin/python -m pip install --upgrade pip
 venv/bin/python -m pip install -r requirements.txt
 cp .env.example .env
 # Put GOOGLE_MAPS_API_KEY in backend/.env (Geocoding API, server-side). Never commit it.
+# Put GEMINI_API_KEY and/or GROQ_API_KEY in backend/.env (LLM extract, server-side).
+# Gemini is a Google AI Studio key — not the Maps key. https://aistudio.google.com/apikey
+# Groq fallback: https://console.groq.com/keys
 venv/bin/python fixtures/fetch_fixtures.py   # download the demo corpus (~32 MB)
 venv/bin/python app.py
 ```
@@ -81,6 +85,8 @@ UI on **http://localhost:5173**, proxying `/api` to Flask.
 
 Enable **Geocoding API** and **Maps JavaScript API** on the same Google Cloud project. Prefer two restrictions: IP (or none, locally) on the server key, HTTP referrers on the browser key. A single unrestricted key works for a laptop demo and is a leak risk if the frontend is ever public.
 
+LLM extract uses **Google AI Studio** (`GEMINI_API_KEY`) and optionally **Groq** (`GROQ_API_KEY`). Those are not Maps Platform keys. The Gemini key never goes in the frontend.
+
 ## Verify the install
 
 ```bash
@@ -88,7 +94,7 @@ backend/venv/bin/python scripts/smoke.py    # contract + behaviour checks, inclu
 backend/venv/bin/python scripts/bench.py    # per-fixture detection numbers
 ```
 
-`smoke.py` covers health, sample listing and image serving, every error code, detection on an obvious-person fixture and a true negative, the upload path, and a decompression-bomb guard. It exits non-zero on any failure. Both scripts accept `--base-url` and `--conf`.
+`smoke.py` covers health, sample listing and image serving, every error code, detection on an obvious-person fixture and a true negative, the upload path, a decompression-bomb guard, geocode/LPB, and extract validation (live extract when an LLM key is set). It exits non-zero on any failure. Both scripts accept `--base-url` and `--conf`.
 
 ## Run one fixture from the CLI
 
@@ -107,24 +113,26 @@ Prints the same JSON shape the API returns.
 
 1. **Open the UI.** Point at the amber banner: every result is a lead to verify, never a confirmation. It cannot be dismissed.
 2. **Say the honest thing first** (10s): "Satellite imagery can't resolve a person — they're one or two pixels. So we detect on drone-altitude imagery, which is where SAR drones actually fly. The map is only for last-known location and a search ring."
-3. **Geocode the prefilled report.** Bruce Trail, Milton, 4.5 hours, elderly hiker. A last-known pin and an ~1.3 km Lost Person Behavior ring appear. Note it is a simplified 50th-percentile heuristic, not operational planning.
-4. **Pick `Single person lying on a lawn`.** Hit Detect. One candidate returns at ~91% confidence in about 4 seconds, box tight on the person. A numbered pin appears inside the ring. Read the demo-placement notice out loud: the photo is tagged here so it can be reviewed on the map — it was not captured in Milton.
-5. **Pick `Conifer stand and bare clearing`** — a true negative. Zero candidates. Read the empty state out loud: *"That is a statement about the detector, not about the ground. It does not mean nobody is there."* This is the credibility moment.
-6. **If asked "how well does it work?"** — give the real numbers from the limits section above, including the 60-pixel floor and the surfer that is never detected. Then say what fixes it: fine-tuning on HERIDAL/SARD, and thermal imagery for night search, since most SAR misses happen after dark.
+3. **Extract the prefilled report.** The caller text is already in the box (Bruce Trail, Milton, dad, 70, red jacket). Hit Extract. Show the structured fields: last-known place, ~4.5 hours, elderly hiker. Say they are a starting point to review, not verified facts. The search form fills and the map geocodes automatically.
+4. **Read the ring.** A last-known pin and an ~1.3 km Lost Person Behavior ring appear. Note it is a simplified 50th-percentile heuristic, not operational planning.
+5. **Pick `Single person lying on a lawn`.** Hit Detect. One candidate returns at ~91% confidence in about 4 seconds, box tight on the person. A numbered pin appears inside the ring. Read the demo-placement notice out loud: the photo is tagged here so it can be reviewed on the map — it was not captured in Milton.
+6. **Pick `Conifer stand and bare clearing`** — a true negative. Zero candidates. Read the empty state out loud: *"That is a statement about the detector, not about the ground. It does not mean nobody is there."* This is the credibility moment.
+7. **If asked "how well does it work?"** — give the real numbers from the limits section above, including the 60-pixel floor and the surfer that is never detected. Then say what fixes it: fine-tuning on HERIDAL/SARD, and thermal imagery for night search, since most SAR misses happen after dark.
 
-Optional, if there is time: `Busy beachfront` shows tiling and cross-tile merge doing real work on many small subjects.
+Optional, if there is time: `Busy beachfront` shows tiling and cross-tile merge doing real work on many small subjects. If extract has no key, skip step 3 and geocode the prefilled search-area form by hand.
 
 ## Architecture
 
 ```
 frontend/                     Vite + React testing UI
-  src/components/             SafetyBanner, SearchArea, SearchMap,
+  src/components/             SafetyBanner, ReportIntake, SearchArea, SearchMap,
                               SamplePicker, UploadZone, DetectionOverlay, DetectionList
   src/api/client.ts           typed fetch wrappers, 180s abort
 backend/
   app.py                      Flask app factory
   config.py                   env-backed settings
-  api/                        health, samples, detect, geocode, error shape
+  api/                        health, samples, detect, geocode, extract, error shape
+  extract/                    Gemini primary, Groq fallback, field normalize
   geo/                        LPB radius, Google geocoder, pixel→lat/lng
   detection/
     model.py                  lazy YOLO load, person-class filter

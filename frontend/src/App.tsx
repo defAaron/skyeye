@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import './App.css'
 import { getHealth, SkyEyeApiError } from './api/client'
 import DetectPanel from './components/DetectPanel'
+import ReportIntake from './components/ReportIntake'
 import SafetyBanner from './components/SafetyBanner'
 import SearchArea from './components/SearchArea'
 import SearchMap from './components/SearchMap'
-import type { DetectResponse, GeocodeResponse, HealthResponse } from './types'
+import type { DetectResponse, ExtractResponse, GeocodeResponse, HealthResponse } from './types'
 
 type HealthState =
   | { status: 'loading' }
@@ -15,6 +16,7 @@ type HealthState =
 export default function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'loading' })
   const [searchArea, setSearchArea] = useState<GeocodeResponse | null>(null)
+  const [intake, setIntake] = useState<ExtractResponse | null>(null)
   const [detectResult, setDetectResult] = useState<DetectResponse | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
   const [pinnedId, setPinnedId] = useState<string | null>(null)
@@ -58,6 +60,8 @@ export default function App() {
   const origin = searchArea ? { lat: searchArea.lat, lng: searchArea.lng } : null
   const geocodeConfigured =
     health.status === 'online' ? health.health.geocode?.configured ?? false : null
+  const extractConfigured =
+    health.status === 'online' ? health.health.extract?.configured ?? false : null
 
   return (
     <>
@@ -133,6 +137,19 @@ export default function App() {
                         : 'not configured'}
                     </dd>
                   </div>
+                  <div className="facts__row">
+                    <dt>Report extract</dt>
+                    <dd>
+                      {health.health.extract?.configured
+                        ? [
+                            health.health.extract.gemini ? 'gemini' : null,
+                            health.health.extract.groq ? 'groq' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' + ') || 'configured'
+                        : 'not configured'}
+                    </dd>
+                  </div>
                 </dl>
               </>
             )}
@@ -153,10 +170,17 @@ export default function App() {
             )}
           </section>
 
+          <ReportIntake
+            extractConfigured={extractConfigured}
+            disabled={false}
+            onExtracted={setIntake}
+          />
+
           <SearchArea
             geocodeConfigured={geocodeConfigured}
             searchArea={searchArea}
             disabled={false}
+            intake={intake}
             onGeocoded={setSearchArea}
           />
 

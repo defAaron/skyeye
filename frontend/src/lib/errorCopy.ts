@@ -92,9 +92,34 @@ const COPY: Record<string, ErrorCopy> = {
     hint: 'The backend has no Maps key, or the Geocoding API is not enabled for it. Detection still works without a map.',
     retryable: true,
   },
+  EMPTY_REPORT: {
+    title: 'No report was given',
+    hint: 'Describe what you know in a few sentences — place, time, and who is missing — then extract again.',
+    retryable: false,
+  },
+  REPORT_TOO_LONG: {
+    title: 'That report is too long',
+    hint: 'Shorten it to at most 4000 characters. A few sentences is enough.',
+    retryable: false,
+  },
+  EXTRACT_INCOMPLETE: {
+    title: 'No last-known place could be extracted',
+    hint: 'Name a trail, park, or town in the report so a search area can be geocoded.',
+    retryable: false,
+  },
+  EXTRACT_FAILED: {
+    title: 'The report could not be extracted',
+    hint: 'Neither language model returned a usable result. Try again in a moment, or fill the search-area fields by hand.',
+    retryable: true,
+  },
+  EXTRACT_UNAVAILABLE: {
+    title: 'Report extraction is not available',
+    hint: 'The backend has no Gemini or Groq key. You can still type a last-known location and geocode by hand.',
+    retryable: true,
+  },
   TIMEOUT: {
-    title: 'The detection run took too long and was stopped',
-    hint: 'Tiled inference on the CPU is slow on very large images. Nothing was assessed. Try again, or submit a smaller image.',
+    title: 'The request took too long and was stopped',
+    hint: 'Nothing was assessed. Try again, or fill the search-area fields by hand.',
     retryable: true,
   },
   CANCELLED: {
@@ -115,7 +140,7 @@ const COPY: Record<string, ErrorCopy> = {
 }
 
 const FALLBACK: ErrorCopy = {
-  title: 'Detection could not be completed',
+  title: 'The request could not be completed',
   hint: 'Nothing was assessed. Treat this as no information rather than an all-clear, and try again.',
   retryable: true,
 }

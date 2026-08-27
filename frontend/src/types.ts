@@ -13,6 +13,11 @@ export interface HealthResponse {
   geocode: {
     configured: boolean
   }
+  extract: {
+    configured: boolean
+    gemini: boolean
+    groq: boolean
+  }
   limits: {
     max_upload_bytes: number
     max_image_pixels: number
@@ -97,6 +102,25 @@ export type LpbCategory =
   | 'hunter'
   | 'unknown'
 
+export interface ExtractRequest {
+  report_text: string
+}
+
+export interface ExtractResponse {
+  location_text: string
+  time_last_seen: string | null
+  elapsed_hours: number
+  subject: {
+    age: number | null
+    clothing: string | null
+    distinguishing_features: string | null
+    category: LpbCategory
+  }
+  terrain_hint: string | null
+  provider: 'gemini' | 'groq'
+  disclaimer: string
+}
+
 export interface GeocodeRequest {
   location_text: string
   elapsed_hours: number
@@ -130,6 +154,11 @@ export type ApiErrorCode =
   | 'GEOCODE_NOT_FOUND'
   | 'GEOCODE_FAILED'
   | 'GEOCODE_UNAVAILABLE'
+  | 'EMPTY_REPORT'
+  | 'REPORT_TOO_LONG'
+  | 'EXTRACT_INCOMPLETE'
+  | 'EXTRACT_FAILED'
+  | 'EXTRACT_UNAVAILABLE'
 
 export interface ApiError {
   error: {

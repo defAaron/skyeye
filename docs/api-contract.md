@@ -1,8 +1,8 @@
-# SkyEye API contract (core detection + search-area map)
+# SkyEye API contract (core detection + search-area map + LLM intake)
 
-Frozen for this build: **image in → ranked person-shaped candidates out → human review**, plus **location text → geocode + LPB radius → map pins**.
+Frozen for this build: **image in → ranked person-shaped candidates out → human review**, plus **report text → LLM extract → geocode + LPB radius → map pins**.
 
-This document is the single source of truth for request/response shapes. No agent may change a shape here without editing this file in the same change. LLM extraction, globe view, and video upload are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md).
+This document is the single source of truth for request/response shapes. No agent may change a shape here without editing this file in the same change. Globe view and video upload are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md).
 
 **Imagery rule:** detection runs on drone-altitude photos. Satellite/map tiles cannot resolve a person (~30–50 cm/pixel makes a human 1–2 pixels), so they are never detector input. Google Maps is a geocoding and display layer only.
 
@@ -21,7 +21,11 @@ skyeye/
 │   │   ├── health.py           # GET /api/health
 │   │   ├── samples.py          # GET /api/samples, GET /api/samples/<id>/image
 │   │   ├── detect.py           # POST /api/detect
-│   │   └── geocode.py          # POST /api/geocode
+│   │   ├── geocode.py          # POST /api/geocode
+│   │   └── extract.py          # POST /api/extract
+│   ├── extract/
+│   │   ├── normalize.py        # clip hours, map category, drop empty location
+│   │   └── providers.py        # Gemini primary, Groq fallback
 │   ├── geo/
 │   │   ├── lpb.py              # Lost Person Behavior radius table
 │   │   ├── geocoder.py         # Google Geocoding API client
@@ -61,7 +65,7 @@ Ownership (one agent per area per step): `backend/detection/` = ML, `backend/app
 - `lat` / `lng` exist on every detection. They are WGS84 numbers when the submitted sample is georeferenced; otherwise both are `null`. They are always `null` for uploads. Both are numbers or both are `null` — never mixed.
 - Detections stay sorted by `confidence` descending. `id` is stable within one response (`d1`, `d2`, …).
 - Every detection response carries `disclaimer`. Clients must display it and must never render "found".
-- Google Maps / Geocoding API keys must never appear in responses, logs, or the git tree.
+- Google Maps, Gemini, and Groq API keys must never appear in responses, logs, or the git tree. Report text is PII-adjacent: log length only, never the body.
 
 ### Errors
 
@@ -82,14 +86,19 @@ All errors use one shape and never leak filesystem paths, stack traces, or confi
 | 400 | `LOCATION_TOO_LONG` | Geocode `location_text` exceeds 200 characters |
 | 400 | `INVALID_ELAPSED_HOURS` | `elapsed_hours` missing or outside `0.1`–`72` |
 | 400 | `UNKNOWN_CATEGORY` | `category` is not in the LPB table |
+| 400 | `EMPTY_REPORT` | Extract `report_text` missing or blank |
+| 400 | `REPORT_TOO_LONG` | Extract `report_text` exceeds 4000 characters |
+| 400 | `EXTRACT_INCOMPLETE` | Model returned JSON with no usable `location_text` |
 | 404 | `SAMPLE_NOT_FOUND` | Unknown `sample_id` |
 | 404 | `GEOCODE_NOT_FOUND` | Google returned zero results for that text |
 | 413 | `FILE_TOO_LARGE` | Upload exceeds `MAX_UPLOAD_BYTES` |
 | 413 | `IMAGE_TOO_LARGE` | Decoded pixels exceed `MAX_IMAGE_PIXELS` |
 | 500 | `INFERENCE_FAILED` | Model load or inference error |
 | 502 | `GEOCODE_FAILED` | Geocoding provider error (no key leaked) |
+| 502 | `EXTRACT_FAILED` | Gemini and Groq both failed (no key leaked) |
 | 503 | `MODEL_UNAVAILABLE` | Weights missing / not yet downloaded |
 | 503 | `GEOCODE_UNAVAILABLE` | `GOOGLE_MAPS_API_KEY` unset, or provider denied the request |
+| 503 | `EXTRACT_UNAVAILABLE` | Neither `GEMINI_API_KEY` nor `GROQ_API_KEY` set, or both providers denied the request |
 
 ---
 
@@ -100,9 +109,10 @@ Liveness plus enough capability info for the UI to warn early.
 ```json
 {
   "status": "ok",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "model": { "loaded": false, "weights": "yolov8n.pt", "device": "cpu" },
   "geocode": { "configured": false },
+  "extract": { "configured": false, "gemini": false, "groq": false },
   "limits": {
     "max_upload_bytes": 26214400,
     "max_image_pixels": 40000000,
@@ -111,7 +121,7 @@ Liveness plus enough capability info for the UI to warn early.
 }
 ```
 
-`model.loaded` is `false` until the first detect request warms the model (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth. `geocode.configured` is `true` when `GOOGLE_MAPS_API_KEY` is non-empty — the key itself is never returned.
+`model.loaded` is `false` until the first detect request warms the model (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth. `geocode.configured` is `true` when `GOOGLE_MAPS_API_KEY` is non-empty — the key itself is never returned. `extract.gemini` / `extract.groq` are `true` when the matching key is non-empty. `extract.configured` is `true` when either provider key is set. Keys are never returned.
 
 ---
 
@@ -255,6 +265,53 @@ The backend calls Google Maps Geocoding API. The key never appears in the respon
 
 ---
 
+## `POST /api/extract`
+
+`application/json`. Turns a free-text missing-person report into structured fields a responder can review. Does **not** geocode or run detection.
+
+```json
+// Request
+{
+  "report_text": "My dad went missing around 3pm near Bruce Trail, Milton. He's 70, wearing a red jacket, last seen walking near the conservation area entrance."
+}
+```
+
+```json
+// Response 200
+{
+  "location_text": "Bruce Trail, Milton",
+  "time_last_seen": "15:00",
+  "elapsed_hours": 4.5,
+  "subject": {
+    "age": 70,
+    "clothing": "red jacket",
+    "distinguishing_features": null,
+    "category": "elderly_hiker"
+  },
+  "terrain_hint": "wooded trail",
+  "provider": "gemini",
+  "disclaimer": "Extracted fields are a starting point for a responder to review. They are not verified facts."
+}
+```
+
+| Field | Rules |
+|-------|--------|
+| `report_text` | Required string, 1–4000 characters after trim |
+
+Response rules:
+
+- `location_text` is a geocodable place (1–200 chars). Empty after the model runs → `EXTRACT_INCOMPLETE`.
+- `elapsed_hours` is clipped to `0.1`–`72`. If the model omits it, default `3.0`.
+- `subject.category` is one of the LPB table values. Unknown labels become `unknown`.
+- `subject.age` is an integer `0`–`120`, or `null`.
+- `time_last_seen`, `clothing`, `distinguishing_features`, `terrain_hint` are strings or `null`.
+- `provider` is `"gemini"` or `"groq"` — which model produced the JSON. Never a key.
+- `disclaimer` is always present. Clients must display it. Extracted fields are not verified facts.
+
+Provider order: Gemini 2.0 Flash first; Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, or fails. Neither key appears in the response. The report body is never logged.
+
+---
+
 ## Environment variables
 
 ### Backend (`backend/.env`, template in `backend/.env.example`)
@@ -271,6 +328,8 @@ The backend calls Google Maps Geocoding API. The key never appears in the respon
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |
 | `MAX_IMAGE_PIXELS` | `40000000` | 40 MP decoded-pixel cap |
 | `GOOGLE_MAPS_API_KEY` | _(empty)_ | Server-side Geocoding API. Never commit. |
+| `GEMINI_API_KEY` | _(empty)_ | Server-side Gemini 2.0 Flash. Never commit. |
+| `GROQ_API_KEY` | _(empty)_ | Server-side Groq fallback. Never commit. |
 
 ### Frontend (`frontend/.env.local`, template in `frontend/.env.example`)
 
@@ -278,4 +337,4 @@ The backend calls Google Maps Geocoding API. The key never appears in the respon
 |-----|---------|
 | `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API. Exposed to the browser by design. Restrict to HTTP referrers (`http://localhost:5173/*`). Never commit the real value. |
 
-API keys must never be committed. Gemini / Groq keys are still later-phase.
+API keys must never be committed. Gemini / Groq keys stay on the backend.
