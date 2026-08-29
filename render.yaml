@@ -9,7 +9,7 @@ services:
     name: skyeye-api
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerContext: .
     plan: standard
     healthCheckPath: /api/health
     envVars:

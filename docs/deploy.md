@@ -23,7 +23,10 @@ warms the model and can take a minute.
 ## 1. Render API
 
 1. New → Web Service → this repo.
-2. Runtime **Docker**. Dockerfile path `backend/Dockerfile`, context `backend`.
+2. Runtime **Docker**.
+   - **Root Directory:** leave blank (repo root)
+   - **Dockerfile Path:** `backend/Dockerfile`
+   - **Docker Build Context:** `.` (repo root — Render’s default)
    Or apply the repo-root [render.yaml](../render.yaml) Blueprint.
 3. Plan **Standard** (`standard` / `1c-2g`), not Free.
 4. Health check path: `/api/health`.
