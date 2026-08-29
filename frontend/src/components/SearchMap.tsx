@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import {
+  APILoadingStatus,
   APIProvider,
   Circle,
   ColorScheme,
   Map,
   Marker,
+  useApiLoadingStatus,
   useMap,
 } from '@vis.gl/react-google-maps'
 import './SearchArea.css'
@@ -14,13 +16,7 @@ import type { Detection, GeocodeResponse } from '../types'
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
 const MAPS_JS_HINT =
-  'Enable Maps JavaScript API for this browser key, turn on billing on the Google Cloud project, and allow this page as an HTTP referrer (https://your-vercel-domain/* and http://localhost:5173/*). Geocoding uses a separate server key and can succeed even when this map does not.'
-
-declare global {
-  interface Window {
-    gm_authFailure?: () => void
-  }
-}
+  'On the project that owns this browser key: enable Maps JavaScript API, link billing, and set HTTP referrers to https://skyeye-one.vercel.app/* and http://localhost:5173/* (the /* is required). Then open DevTools → Console and look for “Google Maps JavaScript API error: …MapError”.'
 
 interface SearchMapProps {
   searchArea: GeocodeResponse | null
@@ -38,18 +34,6 @@ export default function SearchMap({
   onSelect,
 }: SearchMapProps) {
   const pins = detections.filter(hasGeo)
-  const [mapsError, setMapsError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const previous = window.gm_authFailure
-    window.gm_authFailure = () => {
-      setMapsError(`Google Maps JavaScript did not load. ${MAPS_JS_HINT}`)
-      previous?.()
-    }
-    return () => {
-      window.gm_authFailure = previous
-    }
-  }, [])
 
   return (
     <section className="card card--wide" aria-labelledby="map-heading">
@@ -77,55 +61,45 @@ export default function SearchMap({
 
       {MAPS_KEY && searchArea && (
         <div className="search-map">
-          <APIProvider
-            apiKey={MAPS_KEY}
-            onError={() =>
-              setMapsError(`Google Maps JavaScript did not load. ${MAPS_JS_HINT}`)
-            }
-          >
-            {mapsError ? (
-              <p className="notice notice--error search-map__auth" role="status">
-                {mapsError}
-              </p>
-            ) : (
-              <Map
-                className="search-map__frame"
-                defaultCenter={{ lat: searchArea.lat, lng: searchArea.lng }}
-                defaultZoom={13}
-                colorScheme={ColorScheme.LIGHT}
-                gestureHandling="greedy"
-                mapTypeId="roadmap"
-                clickableIcons={false}
-              >
-                <FitToSearch area={searchArea} pins={pins} />
-                <Circle
-                  center={{ lat: searchArea.lat, lng: searchArea.lng }}
-                  radius={searchArea.radius_m}
-                  strokeColor="#0c2461"
-                  strokeOpacity={0.9}
-                  strokeWeight={2}
-                  fillColor="#0c2461"
-                  fillOpacity={0.12}
-                  clickable={false}
-                />
+          <APIProvider apiKey={MAPS_KEY} authReferrerPolicy="origin">
+            <MapAuthBanner />
+            <Map
+              className="search-map__frame"
+              defaultCenter={{ lat: searchArea.lat, lng: searchArea.lng }}
+              defaultZoom={13}
+              colorScheme={ColorScheme.LIGHT}
+              gestureHandling="greedy"
+              mapTypeId="roadmap"
+              clickableIcons={false}
+            >
+              <FitToSearch area={searchArea} pins={pins} />
+              <Circle
+                center={{ lat: searchArea.lat, lng: searchArea.lng }}
+                radius={searchArea.radius_m}
+                strokeColor="#0c2461"
+                strokeOpacity={0.9}
+                strokeWeight={2}
+                fillColor="#0c2461"
+                fillOpacity={0.12}
+                clickable={false}
+              />
+              <Marker
+                position={{ lat: searchArea.lat, lng: searchArea.lng }}
+                title="Last-known location (geocoded) — not a detection"
+              />
+              {pins.map((detection, index) => (
                 <Marker
-                  position={{ lat: searchArea.lat, lng: searchArea.lng }}
-                  title="Last-known location (geocoded) — not a detection"
+                  key={detection.id}
+                  position={{ lat: detection.lat, lng: detection.lng }}
+                  label={String(index + 1)}
+                  title={`Candidate ${index + 1} — ${(detection.confidence * 100).toFixed(1)}% confidence — lead to verify`}
+                  zIndex={detection.id === activeId ? 200 : 50}
+                  onClick={() => onSelect(detection.id)}
+                  onMouseOver={() => onHover(detection.id)}
+                  onMouseOut={() => onHover(null)}
                 />
-                {pins.map((detection, index) => (
-                  <Marker
-                    key={detection.id}
-                    position={{ lat: detection.lat, lng: detection.lng }}
-                    label={String(index + 1)}
-                    title={`Candidate ${index + 1} — ${(detection.confidence * 100).toFixed(1)}% confidence — lead to verify`}
-                    zIndex={detection.id === activeId ? 200 : 50}
-                    onClick={() => onSelect(detection.id)}
-                    onMouseOver={() => onHover(detection.id)}
-                    onMouseOut={() => onHover(null)}
-                  />
-                ))}
-              </Map>
-            )}
+              ))}
+            </Map>
           </APIProvider>
         </div>
       )}
@@ -138,6 +112,18 @@ export default function SearchMap({
         </p>
       )}
     </section>
+  )
+}
+
+function MapAuthBanner() {
+  const status = useApiLoadingStatus()
+  if (status !== APILoadingStatus.AUTH_FAILURE && status !== APILoadingStatus.FAILED) {
+    return null
+  }
+  return (
+    <p className="notice notice--error search-map__auth" role="status">
+      Google Maps JavaScript did not load. {MAPS_JS_HINT}
+    </p>
   )
 }
 
