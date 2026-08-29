@@ -59,8 +59,9 @@ class Settings:
     conf_threshold: float = field(default_factory=lambda: _float("CONF_THRESHOLD", 0.25))
     tile_size: int = field(default_factory=lambda: _int("TILE_SIZE", 640))
     tile_overlap: float = field(default_factory=lambda: _float("TILE_OVERLAP", 0.2))
-    tile_batch_size: int = field(default_factory=lambda: _int("TILE_BATCH_SIZE", 1))
+    tile_batch_size: int = field(default_factory=lambda: _int("TILE_BATCH_SIZE", 4))
     torch_num_threads: int = field(default_factory=lambda: _int("TORCH_NUM_THREADS", 1))
+    detect_max_pixels: int = field(default_factory=lambda: _int("DETECT_MAX_PIXELS", 2_500_000))
     max_upload_bytes: int = field(default_factory=lambda: _int("MAX_UPLOAD_BYTES", 25 * 1024 * 1024))
     max_image_pixels: int = field(default_factory=lambda: _int("MAX_IMAGE_PIXELS", 40_000_000))
 

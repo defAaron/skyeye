@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import gc
 import json
 import logging
 import math
@@ -27,8 +26,8 @@ logger = logging.getLogger(__name__)
 # and are the usual status-137 on a 2 GB Render box.
 _infer_lock = threading.RLock()
 
-# Tiles per model call. Default 1 (see TILE_BATCH_SIZE) so a 2 GB instance
-# does not hold eight 640px crops plus activations at once.
+# Tiles per model call. Four 640px crops are cheap; one-at-a-time on a 10 MP
+# aerial is what blows the 180s client budget on Render CPU.
 MAX_TILE_BATCH_SIZE = 8
 
 # YOLOv8's native input size.
@@ -37,6 +36,46 @@ MODEL_IMGSZ = 640
 
 def _tile_batch_size() -> int:
     return max(1, min(MAX_TILE_BATCH_SIZE, int(settings.tile_batch_size)))
+
+
+def _fit_for_detect(image: Image.Image) -> tuple[Image.Image, int, int]:
+    """Downscale huge aerials so the tile grid can finish inside the request budget.
+
+    Boxes are projected back to the original pixel space before the response.
+    """
+    orig_w, orig_h = image.width, image.height
+    budget = max(MODEL_IMGSZ * MODEL_IMGSZ, int(settings.detect_max_pixels))
+    pixels = orig_w * orig_h
+    if pixels <= budget:
+        return image, orig_w, orig_h
+    scale = math.sqrt(budget / pixels)
+    width = max(1, int(round(orig_w * scale)))
+    height = max(1, int(round(orig_h * scale)))
+    return image.resize((width, height), Image.Resampling.BILINEAR), orig_w, orig_h
+
+
+def _detections_to_original(
+    detections: list[Detection],
+    src_w: int,
+    src_h: int,
+    orig_w: int,
+    orig_h: int,
+) -> list[Detection]:
+    if src_w == orig_w and src_h == orig_h:
+        return detections
+    sx = orig_w / src_w
+    sy = orig_h / src_h
+    scaled: list[Detection] = []
+    for detection in detections:
+        x1, y1, x2, y2 = detection.bbox_xyxy
+        scaled.append(
+            Detection(
+                bbox_xyxy=project_box([x1 * sx, y1 * sy, x2 * sx, y2 * sy], 0, 0, orig_w, orig_h),
+                confidence=detection.confidence,
+                class_name=detection.class_name,
+            )
+        )
+    return scaled
 
 
 def _infer_imgsz() -> int:
@@ -162,11 +201,16 @@ def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]
     """
     with _infer_lock:
         image = _as_rgb(image)
-        grid = tile_grid(image.width, image.height)
+        work, orig_w, orig_h = _fit_for_detect(image)
+        grid = tile_grid(work.width, work.height)
         tiles = len(grid)
 
         if tiles <= 1:
-            return detect_full_image(image, conf), max(tiles, 1)
+            detections = detect_full_image(work, conf)
+            return (
+                _detections_to_original(detections, work.width, work.height, orig_w, orig_h),
+                max(tiles, 1),
+            )
 
         model = get_model()
         class_ids = _target_class_ids(model)
@@ -176,22 +220,27 @@ def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]
 
         allowed = set(class_ids)
         raw: list[Detection] = []
-        for batch in _batched(iter_tiles(image), _tile_batch_size()):
+        for batch in _batched(iter_tiles(work), _tile_batch_size()):
             results = _predict(model, [tile.image for tile in batch], conf, class_ids)
             for tile, result in zip(batch, results):
                 raw.extend(
                     _detections_from_result(
-                        result, allowed, tile.offset_x, tile.offset_y, image.width, image.height
+                        result, allowed, tile.offset_x, tile.offset_y, work.width, work.height
                     )
                 )
             del results, batch
-            gc.collect()
 
-        merged = _sorted_desc(merge_detections(raw))
+        merged = _sorted_desc(
+            _detections_to_original(
+                merge_detections(raw), work.width, work.height, orig_w, orig_h
+            )
+        )
         logger.info(
-            "tiled detect %dx%d tiles=%d raw=%d merged=%d conf=%.2f",
-            image.width,
-            image.height,
+            "tiled detect %dx%d work=%dx%d tiles=%d raw=%d merged=%d conf=%.2f",
+            orig_w,
+            orig_h,
+            work.width,
+            work.height,
             tiles,
             len(raw),
             len(merged),

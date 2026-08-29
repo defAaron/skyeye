@@ -347,8 +347,9 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 | `CONF_THRESHOLD` | `0.25` | Default confidence floor |
 | `TILE_SIZE` | `640` | Sliding-window tile edge in pixels |
 | `TILE_OVERLAP` | `0.2` | Fractional tile overlap |
-| `TILE_BATCH_SIZE` | `1` | Tiles per YOLO forward. Keep `1` on Render; `4`–`8` on a laptop with RAM to spare |
+| `TILE_BATCH_SIZE` | `4` | Tiles per YOLO forward |
 | `TORCH_NUM_THREADS` | `1` | PyTorch/OMP threads. `1` avoids a 137 OOM on a 2 GB instance |
+| `DETECT_MAX_PIXELS` | `2500000` | Working resolution for detect. Larger images are downscaled, then boxes are mapped back |
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |
 | `MAX_IMAGE_PIXELS` | `40000000` | 40 MP decoded-pixel cap |
 | `GOOGLE_MAPS_API_KEY` | _(empty)_ | Server-side Geocoding API. Never commit. |
