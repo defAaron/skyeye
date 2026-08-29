@@ -37,7 +37,7 @@ Quote these numbers rather than implying the detector is better than it is:
 |-------|------|
 | Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`, `/api/extract`) |
 | Detection | YOLOv8n via Ultralytics, sliding-window tiling + IoU/containment merge |
-| Intake | Gemini 2.0 Flash (primary), Groq Llama 3.1 8B Instant (fallback) |
+| Intake | Gemini Flash (primary: `gemini-flash-latest` → 3.5 / 3.1-lite), Groq Llama 3.1 8B Instant (fallback) |
 | Geocoding | Google Maps Geocoding API (server-side) |
 | Map | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
 | Search radius | Simplified Lost Person Behavior 50th-percentile table |

@@ -310,7 +310,7 @@ Response rules:
 - `provider` is `"gemini"` or `"groq"` — which model produced the JSON. Never a key.
 - `disclaimer` is always present. Clients must display it. Extracted fields are not verified facts.
 
-Provider order: Gemini 2.0 Flash first; Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, locally rate-limited, or fails. Neither key appears in the response. The report body is never logged.
+Provider order: Gemini Flash first (`gemini-flash-latest`, then `gemini-3.5-flash`, then `gemini-3.1-flash-lite`); Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, locally rate-limited, or fails. Neither key appears in the response. The report body is never logged.
 
 ### Rate limits
 
@@ -345,7 +345,7 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |
 | `MAX_IMAGE_PIXELS` | `40000000` | 40 MP decoded-pixel cap |
 | `GOOGLE_MAPS_API_KEY` | _(empty)_ | Server-side Geocoding API. Never commit. |
-| `GEMINI_API_KEY` | _(empty)_ | Server-side Gemini 2.0 Flash. Never commit. |
+| `GEMINI_API_KEY` | _(empty)_ | Server-side Gemini Flash. Never commit. |
 | `GROQ_API_KEY` | _(empty)_ | Server-side Groq fallback. Never commit. |
 | `GEMINI_MAX_RPM` | `8` | Process-wide Gemini calls per rolling minute |
 | `GEMINI_MAX_RPD` | `200` | Process-wide Gemini calls per rolling day |

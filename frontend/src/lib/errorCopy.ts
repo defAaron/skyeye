@@ -114,7 +114,7 @@ const COPY: Record<string, ErrorCopy> = {
   },
   EXTRACT_UNAVAILABLE: {
     title: 'Report extraction is not available',
-    hint: 'The backend has no Gemini or Groq key. You can still type a last-known location and geocode by hand.',
+    hint: 'Gemini may be at quota, or no Gemini/Groq key is configured. Wait a moment and try again, or type a last-known location and geocode by hand.',
     retryable: true,
   },
   RATE_LIMITED: {

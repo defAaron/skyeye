@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 TIMEOUT_SECONDS = 12
 USER_AGENT = "SkyEye/0.3 (RescueHacks SAR demo)"
 
-GEMINI_MODELS = ("gemini-2.0-flash", "gemini-2.5-flash")
+# Gemini 2.0 Flash (and 2.5 Flash on many keys) retired June 2026.
+# Try the moving alias first, then the documented 3.x Flash replacements.
+GEMINI_MODELS = ("gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite")
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODELS = ("llama-3.1-8b-instant", "llama-3.3-70b-versatile")
 
@@ -131,6 +133,7 @@ def _gemini_url(model: str) -> str:
 def _gemini(report_text: str) -> dict:
     key = settings.gemini_api_key
     last_status = 0
+    saw_quota = False
     for model in GEMINI_MODELS:
         allowed, retry_after = acquire_gemini()
         if not allowed:
@@ -156,7 +159,7 @@ def _gemini(report_text: str) -> dict:
         )
         last_status = status
         if status in {400, 404}:
-            logger.warning("extract gemini model rejected status=%s", status)
+            logger.warning("extract gemini model rejected model=%s status=%s", model, status)
             continue
         if status in {401, 403}:
             raise ExtractProviderError(
@@ -165,13 +168,11 @@ def _gemini(report_text: str) -> dict:
                 "The primary extraction provider denied the request.",
             )
         if status == 429:
-            trip_gemini_cooldown()
-            raise ExtractProviderError(
-                503,
-                "EXTRACT_UNAVAILABLE",
-                "The primary extraction provider is at quota.",
-                retry_after=settings.gemini_cooldown_seconds,
-            )
+            # Per-model free-tier exhaustion is common; try the next id before
+            # treating the whole key as spent.
+            saw_quota = True
+            logger.warning("extract gemini model at quota model=%s", model)
+            continue
         if status != 200 or not isinstance(payload, dict):
             raise ExtractProviderError(
                 502,
@@ -194,9 +195,17 @@ def _gemini(report_text: str) -> dict:
         except ExtractNormalizeError as exc:
             raise ExtractProviderError(400, exc.code, exc.message) from None
 
+    if saw_quota:
+        trip_gemini_cooldown()
+        raise ExtractProviderError(
+            503,
+            "EXTRACT_UNAVAILABLE",
+            "The primary extraction provider is at quota.",
+            retry_after=settings.gemini_cooldown_seconds,
+        )
     raise ExtractProviderError(
-        502 if last_status not in {401, 403, 429} else 503,
-        "EXTRACT_FAILED" if last_status not in {401, 403, 429} else "EXTRACT_UNAVAILABLE",
+        502 if last_status not in {401, 403} else 503,
+        "EXTRACT_FAILED" if last_status not in {401, 403} else "EXTRACT_UNAVAILABLE",
         "The primary extraction provider could not be reached.",
     )
 
