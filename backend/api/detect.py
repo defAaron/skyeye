@@ -10,6 +10,7 @@ from api.errors import ApiError
 from api.samples import find_sample, sample_image_path
 from config import DISCLAIMER, settings
 from geo.project import apply_geo, meta_geo
+from ratelimit import enforce_client_limit
 
 bp = Blueprint("detect", __name__)
 
@@ -89,6 +90,7 @@ def _resolve_input() -> tuple[Image.Image, str, str | None, dict | None]:
 
 @bp.post("/api/detect")
 def detect():
+    enforce_client_limit("detect")
     started = time.perf_counter()
     image, source, sample_id, sample_entry = _resolve_input()
     conf = _parse_conf()

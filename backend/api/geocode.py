@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from api.errors import ApiError
 from geo.geocoder import GeocodeProviderError, geocode_address
 from geo.lpb import CATEGORIES, LPB_NOTE, radius_m
+from ratelimit import enforce_client_limit
 
 bp = Blueprint("geocode", __name__)
 
@@ -59,11 +60,14 @@ def _parse_body() -> tuple[str, float, str]:
 
 @bp.post("/api/geocode")
 def geocode():
+    enforce_client_limit("geocode")
     location_text, elapsed_hours, category = _parse_body()
     try:
         lat, lng, formatted = geocode_address(location_text)
     except GeocodeProviderError as exc:
-        raise ApiError(exc.status, exc.code, exc.message) from None
+        raise ApiError(
+            exc.status, exc.code, exc.message, retry_after=exc.retry_after
+        ) from None
 
     return jsonify(
         {

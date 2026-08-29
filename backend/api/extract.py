@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 
 from api.errors import ApiError
 from extract.providers import ExtractProviderError, extract_report
+from ratelimit import enforce_client_limit
 
 bp = Blueprint("extract", __name__)
 
@@ -30,9 +31,12 @@ def _parse_body() -> str:
 
 @bp.post("/api/extract")
 def extract():
+    enforce_client_limit("extract")
     report_text = _parse_body()
     try:
         payload = extract_report(report_text)
     except ExtractProviderError as exc:
-        raise ApiError(exc.status, exc.code, exc.message) from None
+        raise ApiError(
+            exc.status, exc.code, exc.message, retry_after=exc.retry_after
+        ) from None
     return jsonify(payload)

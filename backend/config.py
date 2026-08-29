@@ -57,6 +57,36 @@ class Settings:
         default_factory=lambda: (os.environ.get("GROQ_API_KEY") or "").strip()
     )
 
+    # Stay under typical Gemini free-tier RPM/RPD so a tight UI loop cannot
+    # burn the key. Defaults are conservative vs ~10–15 RPM / ~250–1500 RPD.
+    gemini_max_rpm: int = field(default_factory=lambda: _int("GEMINI_MAX_RPM", 8))
+    gemini_max_rpd: int = field(default_factory=lambda: _int("GEMINI_MAX_RPD", 200))
+    gemini_cooldown_seconds: int = field(
+        default_factory=lambda: _int("GEMINI_COOLDOWN_SECONDS", 60)
+    )
+    groq_max_rpm: int = field(default_factory=lambda: _int("GROQ_MAX_RPM", 20))
+    groq_max_rpd: int = field(default_factory=lambda: _int("GROQ_MAX_RPD", 500))
+    groq_cooldown_seconds: int = field(
+        default_factory=lambda: _int("GROQ_COOLDOWN_SECONDS", 30)
+    )
+    geocode_max_rpm: int = field(default_factory=lambda: _int("GEOCODE_MAX_RPM", 20))
+    geocode_max_rpd: int = field(default_factory=lambda: _int("GEOCODE_MAX_RPD", 400))
+    geocode_cooldown_seconds: int = field(
+        default_factory=lambda: _int("GEOCODE_COOLDOWN_SECONDS", 60)
+    )
+    extract_ip_per_minute: int = field(
+        default_factory=lambda: _int("EXTRACT_IP_PER_MINUTE", 8)
+    )
+    extract_ip_per_day: int = field(default_factory=lambda: _int("EXTRACT_IP_PER_DAY", 20))
+    geocode_ip_per_minute: int = field(
+        default_factory=lambda: _int("GEOCODE_IP_PER_MINUTE", 10)
+    )
+    geocode_ip_per_day: int = field(default_factory=lambda: _int("GEOCODE_IP_PER_DAY", 80))
+    detect_ip_per_minute: int = field(
+        default_factory=lambda: _int("DETECT_IP_PER_MINUTE", 20)
+    )
+    detect_ip_per_day: int = field(default_factory=lambda: _int("DETECT_IP_PER_DAY", 80))
+
     @property
     def geocode_configured(self) -> bool:
         return bool(self.google_maps_api_key)

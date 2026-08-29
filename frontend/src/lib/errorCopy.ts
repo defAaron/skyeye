@@ -117,6 +117,11 @@ const COPY: Record<string, ErrorCopy> = {
     hint: 'The backend has no Gemini or Groq key. You can still type a last-known location and geocode by hand.',
     retryable: true,
   },
+  RATE_LIMITED: {
+    title: 'Too many requests just now',
+    hint: 'The server paused calls to the language-model and map keys so a quota is not burned. Wait a moment, then try again, or fill the search-area fields by hand.',
+    retryable: true,
+  },
   TIMEOUT: {
     title: 'The request took too long and was stopped',
     hint: 'Nothing was assessed. Try again, or fill the search-area fields by hand.',

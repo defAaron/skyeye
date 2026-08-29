@@ -8,7 +8,7 @@ Run against a live backend (defaults to the dev port):
 Checks the contract in docs/api-contract.md: health, sample listing, sample image
 serving, error handling, detection on both an obvious-person fixture and a
 true negative, geocode validation, LPB radius, live geocode when configured,
-extract validation, and live extract when configured.
+the in-process rate limiter, extract validation, and live extract when configured.
 Exits non-zero if any check fails.
 """
 
@@ -504,7 +504,20 @@ def main() -> int:
             f"{status} {body.get('error', {}).get('code')}",
         )
 
-    print("\n[8] Extract")
+    print("\n[8] Rate limiter")
+    from ratelimit import RateLimiter
+
+    window = RateLimiter()
+    report.add(window.consume("k", [(2, 60.0)])[0], "limiter allows the first event")
+    report.add(window.consume("k", [(2, 60.0)])[0], "limiter allows up to the cap")
+    blocked, retry_after = window.consume("k", [(2, 60.0)])
+    report.add(not blocked, "limiter blocks once the cap is reached")
+    report.add(retry_after >= 1, "blocked consume returns Retry-After seconds")
+    window.trip_cooldown("gemini", 15)
+    cooled, cooldown_retry = window.consume("gemini", [(8, 60.0)])
+    report.add(not cooled and cooldown_retry >= 1, "Gemini cooldown blocks further calls")
+
+    print("\n[9] Extract")
     from extract.normalize import ExtractNormalizeError, normalize
 
     clipped = normalize(

@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 
 from config import settings
+from ratelimit import acquire_geocode, trip_geocode_cooldown
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +20,18 @@ USER_AGENT = "SkyEye/0.2 (RescueHacks SAR demo)"
 
 
 class GeocodeProviderError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        retry_after: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.retry_after = retry_after
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -42,6 +50,16 @@ def geocode_address(location_text: str) -> tuple[float, float, str]:
             503,
             "GEOCODE_UNAVAILABLE",
             "Geocoding is not configured on this server.",
+        )
+
+    allowed, retry_after = acquire_geocode()
+    if not allowed:
+        logger.warning("geocode skipped reason=rate_limit retry_after=%s", retry_after)
+        raise GeocodeProviderError(
+            429,
+            "RATE_LIMITED",
+            "Too many geocode requests. Wait a moment and try again.",
+            retry_after=retry_after,
         )
 
     query = urllib.parse.urlencode({"address": location_text, "key": key})
@@ -101,10 +119,17 @@ def geocode_address(location_text: str) -> tuple[float, float, str]:
         )
     if status in {"REQUEST_DENIED", "OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT"}:
         logger.warning("geocode provider denied request status=%s", status)
+        if status in {"OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT"}:
+            trip_geocode_cooldown()
         raise GeocodeProviderError(
             503,
             "GEOCODE_UNAVAILABLE",
             "Geocoding is not available. Check that the Geocoding API is enabled for this key.",
+            retry_after=(
+                settings.geocode_cooldown_seconds
+                if status in {"OVER_DAILY_LIMIT", "OVER_QUERY_LIMIT"}
+                else None
+            ),
         )
     if status == "INVALID_REQUEST":
         raise GeocodeProviderError(

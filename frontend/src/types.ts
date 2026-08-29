@@ -159,6 +159,7 @@ export type ApiErrorCode =
   | 'EXTRACT_INCOMPLETE'
   | 'EXTRACT_FAILED'
   | 'EXTRACT_UNAVAILABLE'
+  | 'RATE_LIMITED'
 
 export interface ApiError {
   error: {

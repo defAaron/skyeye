@@ -15,6 +15,7 @@ skyeye/
 ├── backend/
 │   ├── app.py                  # Flask app factory + entrypoint
 │   ├── config.py               # env-backed settings (limits, weights, CORS)
+│   ├── ratelimit.py            # in-process sliding-window + Gemini/Groq/Maps budgets
 │   ├── requirements.txt
 │   ├── api/
 │   │   ├── __init__.py
@@ -69,7 +70,7 @@ Ownership (one agent per area per step): `backend/detection/` = ML, `backend/app
 
 ### Errors
 
-All errors use one shape and never leak filesystem paths, stack traces, or config:
+All errors use one shape and never leak filesystem paths, stack traces, or config. `429 RATE_LIMITED` also sets `Retry-After` (seconds).
 
 ```json
 { "error": { "code": "IMAGE_TOO_LARGE", "message": "Image exceeds the 40 megapixel limit." } }
@@ -99,6 +100,7 @@ All errors use one shape and never leak filesystem paths, stack traces, or confi
 | 503 | `MODEL_UNAVAILABLE` | Weights missing / not yet downloaded |
 | 503 | `GEOCODE_UNAVAILABLE` | `GOOGLE_MAPS_API_KEY` unset, or provider denied the request |
 | 503 | `EXTRACT_UNAVAILABLE` | Neither `GEMINI_API_KEY` nor `GROQ_API_KEY` set, or both providers denied the request |
+| 429 | `RATE_LIMITED` | Per-IP or provider budget exceeded. `Retry-After` is set to seconds until a slot frees. |
 
 ---
 
@@ -308,7 +310,22 @@ Response rules:
 - `provider` is `"gemini"` or `"groq"` — which model produced the JSON. Never a key.
 - `disclaimer` is always present. Clients must display it. Extracted fields are not verified facts.
 
-Provider order: Gemini 2.0 Flash first; Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, or fails. Neither key appears in the response. The report body is never logged.
+Provider order: Gemini 2.0 Flash first; Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, locally rate-limited, or fails. Neither key appears in the response. The report body is never logged.
+
+### Rate limits
+
+In-process sliding windows (reset on process restart). They exist so a tight UI loop or a scripted client cannot burn `GEMINI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_MAPS_API_KEY`. Limits are not returned from `/api/health`. `X-Forwarded-For` is ignored.
+
+| Guard | Default | What it protects |
+|-------|---------|------------------|
+| Per-IP `/api/extract` | 8/min, 20/day | Gemini + Groq keys |
+| Per-IP `/api/geocode` | 10/min, 80/day | Maps Geocoding key |
+| Per-IP `/api/detect` | 20/min, 80/day | CPU / model |
+| Gemini global | 8 RPM, 200 RPD | `GEMINI_API_KEY` (under typical free-tier 10–15 RPM) |
+| Groq global | 20 RPM, 500 RPD | `GROQ_API_KEY` |
+| Geocode global | 20 RPM, 400 RPD | `GOOGLE_MAPS_API_KEY` |
+
+A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini and uses Groq. Hitting the per-IP extract cap returns `429 RATE_LIMITED` without calling either provider. Hitting the Gemini budget (or cooldown) skips Gemini only.
 
 ---
 
@@ -330,6 +347,21 @@ Provider order: Gemini 2.0 Flash first; Groq Llama 3.1 8B Instant if Gemini is u
 | `GOOGLE_MAPS_API_KEY` | _(empty)_ | Server-side Geocoding API. Never commit. |
 | `GEMINI_API_KEY` | _(empty)_ | Server-side Gemini 2.0 Flash. Never commit. |
 | `GROQ_API_KEY` | _(empty)_ | Server-side Groq fallback. Never commit. |
+| `GEMINI_MAX_RPM` | `8` | Process-wide Gemini calls per rolling minute |
+| `GEMINI_MAX_RPD` | `200` | Process-wide Gemini calls per rolling day |
+| `GEMINI_COOLDOWN_SECONDS` | `60` | Skip Gemini this long after a provider 429 |
+| `GROQ_MAX_RPM` | `20` | Process-wide Groq calls per rolling minute |
+| `GROQ_MAX_RPD` | `500` | Process-wide Groq calls per rolling day |
+| `GROQ_COOLDOWN_SECONDS` | `30` | Skip Groq this long after a provider 429 |
+| `GEOCODE_MAX_RPM` | `20` | Process-wide Geocoding calls per rolling minute |
+| `GEOCODE_MAX_RPD` | `400` | Process-wide Geocoding calls per rolling day |
+| `GEOCODE_COOLDOWN_SECONDS` | `60` | Skip Geocoding this long after `OVER_QUERY_LIMIT` |
+| `EXTRACT_IP_PER_MINUTE` | `8` | Per-client extract cap |
+| `EXTRACT_IP_PER_DAY` | `20` | Per-client extract cap |
+| `GEOCODE_IP_PER_MINUTE` | `10` | Per-client geocode cap |
+| `GEOCODE_IP_PER_DAY` | `80` | Per-client geocode cap |
+| `DETECT_IP_PER_MINUTE` | `20` | Per-client detect cap |
+| `DETECT_IP_PER_DAY` | `80` | Per-client detect cap |
 
 ### Frontend (`frontend/.env.local`, template in `frontend/.env.example`)
 

@@ -87,6 +87,8 @@ Enable **Geocoding API** and **Maps JavaScript API** on the same Google Cloud pr
 
 LLM extract uses **Google AI Studio** (`GEMINI_API_KEY`) and optionally **Groq** (`GROQ_API_KEY`). Those are not Maps Platform keys. The Gemini key never goes in the frontend.
 
+The backend rate-limits `/api/extract`, `/api/geocode`, and `/api/detect` per client IP, and separately caps outbound Gemini / Groq / Geocoding calls so a scripted loop cannot exhaust a free-tier key. Defaults stay under typical Gemini free-tier RPM. A Gemini 429 trips a short cooldown and the next extract uses Groq. Tune via `GEMINI_MAX_RPM` / `GEMINI_MAX_RPD` in `backend/.env`.
+
 ## Verify the install
 
 ```bash
@@ -131,6 +133,7 @@ frontend/                     Vite + React testing UI
 backend/
   app.py                      Flask app factory
   config.py                   env-backed settings
+  ratelimit.py                in-process sliding-window + Gemini/Groq/Maps budgets
   api/                        health, samples, detect, geocode, extract, error shape
   extract/                    Gemini primary, Groq fallback, field normalize
   geo/                        LPB radius, Google geocoder, pixel→lat/lng

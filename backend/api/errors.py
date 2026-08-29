@@ -6,21 +6,31 @@ from flask import jsonify
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        retry_after: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.retry_after = retry_after
 
 
-def error_response(status: int, code: str, message: str):
-    return jsonify({"error": {"code": code, "message": message}}), status
+def error_response(status: int, code: str, message: str, retry_after: int | None = None):
+    response = jsonify({"error": {"code": code, "message": message}})
+    if retry_after is not None:
+        response.headers["Retry-After"] = str(max(1, int(retry_after)))
+    return response, status
 
 
 def register_error_handlers(app) -> None:
     @app.errorhandler(ApiError)
     def _handle_api_error(exc: ApiError):
-        return error_response(exc.status, exc.code, exc.message)
+        return error_response(exc.status, exc.code, exc.message, exc.retry_after)
 
     @app.errorhandler(404)
     def _handle_404(_exc):

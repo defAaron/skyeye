@@ -11,6 +11,7 @@ import urllib.request
 from config import settings
 from extract.normalize import ExtractNormalizeError, normalize
 from geo.lpb import CATEGORIES
+from ratelimit import acquire_gemini, acquire_groq, trip_gemini_cooldown, trip_groq_cooldown
 
 logger = logging.getLogger(__name__)
 
@@ -61,11 +62,18 @@ GEMINI_RESPONSE_SCHEMA = {
 
 
 class ExtractProviderError(Exception):
-    def __init__(self, status: int, code: str, message: str) -> None:
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        retry_after: int | None = None,
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.retry_after = retry_after
 
 
 def _ssl_context() -> ssl.SSLContext:
@@ -124,6 +132,15 @@ def _gemini(report_text: str) -> dict:
     key = settings.gemini_api_key
     last_status = 0
     for model in GEMINI_MODELS:
+        allowed, retry_after = acquire_gemini()
+        if not allowed:
+            logger.info("extract gemini skipped reason=rate_limit retry_after=%s", retry_after)
+            raise ExtractProviderError(
+                429,
+                "RATE_LIMITED",
+                "The primary extraction provider is at its local rate limit.",
+                retry_after=retry_after,
+            )
         status, payload = _post_json(
             _gemini_url(model),
             {"x-goog-api-key": key},
@@ -148,10 +165,12 @@ def _gemini(report_text: str) -> dict:
                 "The primary extraction provider denied the request.",
             )
         if status == 429:
+            trip_gemini_cooldown()
             raise ExtractProviderError(
                 503,
                 "EXTRACT_UNAVAILABLE",
                 "The primary extraction provider is at quota.",
+                retry_after=settings.gemini_cooldown_seconds,
             )
         if status != 200 or not isinstance(payload, dict):
             raise ExtractProviderError(
@@ -186,6 +205,15 @@ def _groq(report_text: str) -> dict:
     key = settings.groq_api_key
     last_status = 0
     for model in GROQ_MODELS:
+        allowed, retry_after = acquire_groq()
+        if not allowed:
+            logger.info("extract groq skipped reason=rate_limit retry_after=%s", retry_after)
+            raise ExtractProviderError(
+                429,
+                "RATE_LIMITED",
+                "The fallback extraction provider is at its local rate limit.",
+                retry_after=retry_after,
+            )
         status, payload = _post_json(
             GROQ_URL,
             {"Authorization": f"Bearer {key}"},
@@ -213,10 +241,12 @@ def _groq(report_text: str) -> dict:
                 "The fallback extraction provider denied the request.",
             )
         if status == 429:
+            trip_groq_cooldown()
             raise ExtractProviderError(
                 503,
                 "EXTRACT_UNAVAILABLE",
                 "The fallback extraction provider is at quota.",
+                retry_after=settings.groq_cooldown_seconds,
             )
         if status != 200 or not isinstance(payload, dict):
             raise ExtractProviderError(
@@ -263,9 +293,17 @@ def extract_report(report_text: str) -> dict:
             return result
         except ExtractProviderError as exc:
             last_error = exc
-            logger.warning(
-                "extract gemini failed code=%s report_len=%d", exc.code, len(report_text)
-            )
+            if exc.code == "RATE_LIMITED":
+                logger.info(
+                    "extract gemini skipped code=RATE_LIMITED report_len=%d",
+                    len(report_text),
+                )
+            else:
+                logger.warning(
+                    "extract gemini failed code=%s report_len=%d",
+                    exc.code,
+                    len(report_text),
+                )
             if exc.code == "EXTRACT_INCOMPLETE" and not settings.groq_configured:
                 raise
 
@@ -276,9 +314,17 @@ def extract_report(report_text: str) -> dict:
             return result
         except ExtractProviderError as exc:
             last_error = exc
-            logger.warning(
-                "extract groq failed code=%s report_len=%d", exc.code, len(report_text)
-            )
+            if exc.code == "RATE_LIMITED":
+                logger.info(
+                    "extract groq skipped code=RATE_LIMITED report_len=%d",
+                    len(report_text),
+                )
+            else:
+                logger.warning(
+                    "extract groq failed code=%s report_len=%d",
+                    exc.code,
+                    len(report_text),
+                )
             raise
 
     if last_error is not None:
