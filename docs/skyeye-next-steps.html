@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SkyEye — Next Steps, Future Direction &amp; Potential Impact</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f0ea;
+        --ink: #1c1b19;
+        --fg: #3d3d3d;
+        --muted: #6a655f;
+        --line: #cfc8bc;
+        --navy: #0c2461;
+        --navy-soft: #1e3a8a;
+        --card: #fffcf7;
+        --on-navy: #f5f0ea;
+        --display: "Barlow Condensed", sans-serif;
+        --body: Inter, system-ui, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        background: #1a1914;
+        color: var(--fg);
+        font-family: var(--body);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      @page {
+        size: letter;
+        margin: 0;
+      }
+
+      .sheet {
+        width: 8.5in;
+        height: 11in;
+        background: var(--bg);
+        position: relative;
+        overflow: hidden;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .sheet:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+
+      .sheet--cover {
+        display: grid;
+        grid-template-columns: 3.15in 1fr;
+      }
+
+      .cover-navy {
+        background: var(--navy);
+        color: var(--on-navy);
+        padding: 0.55in 0.42in 0.48in;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .cover-navy img {
+        width: 52px;
+        height: 52px;
+        border-radius: 11px;
+        background: #fff;
+      }
+
+      .cover-kicker {
+        margin-top: 0.42in;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        opacity: 0.72;
+      }
+
+      .cover-navy h1 {
+        font-family: var(--display);
+        font-size: 64px;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        line-height: 0.88;
+        text-transform: uppercase;
+        margin: 10px 0 28px;
+      }
+
+      .cover-facts {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-top: auto;
+      }
+
+      .cover-facts dt {
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        opacity: 0.62;
+        margin-bottom: 3px;
+      }
+
+      .cover-facts dd {
+        font-size: 13.5px;
+        line-height: 1.35;
+        font-weight: 500;
+      }
+
+      .cover-safety {
+        margin-top: 28px;
+        padding-top: 16px;
+        border-top: 1px solid rgb(245 240 234 / 22%);
+        font-size: 11px;
+        line-height: 1.45;
+        opacity: 0.78;
+      }
+
+      .cover-cream {
+        padding: 0.55in 0.5in 0.48in 0.46in;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+
+      .cover-cream::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(var(--line) 0.7px, transparent 0.7px);
+        background-size: 18px 18px;
+        opacity: 0.38;
+        pointer-events: none;
+      }
+
+      .cover-cream > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--navy);
+      }
+
+      .cover-cream h2 {
+        font-family: var(--display);
+        font-size: 46px;
+        font-weight: 800;
+        letter-spacing: 0.035em;
+        line-height: 0.9;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin: 0.38in 0 18px;
+      }
+
+      .lede {
+        font-size: 14.5px;
+        line-height: 1.5;
+        color: var(--fg);
+        max-width: 28em;
+      }
+
+      .lede strong {
+        font-weight: 600;
+        color: var(--navy);
+      }
+
+      .toc {
+        margin-top: 0.42in;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        border-top: 1.5px solid var(--navy);
+      }
+
+      .toc li {
+        list-style: none;
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 12px;
+        padding: 13px 0;
+        border-bottom: 1px solid var(--line);
+        align-items: baseline;
+      }
+
+      .toc .n {
+        font-family: var(--display);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        color: var(--navy);
+      }
+
+      .toc h3 {
+        font-family: var(--display);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 2px;
+      }
+
+      .toc p {
+        font-size: 12px;
+        line-height: 1.4;
+        color: var(--muted);
+      }
+
+      .tagline {
+        margin-top: auto;
+        font-family: var(--display);
+        font-size: 20px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--navy);
+      }
+
+      /* Interior */
+      .sheet--in {
+        padding: 0.42in 0.52in 0.38in 0.58in;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sheet--in::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 9px;
+        background: var(--navy);
+      }
+
+      .sheet--in::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(var(--line) 0.65px, transparent 0.65px);
+        background-size: 20px 20px;
+        opacity: 0.28;
+        pointer-events: none;
+      }
+
+      .sheet--in > * {
+        position: relative;
+        z-index: 1;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding-bottom: 10px;
+        border-bottom: 1.5px solid var(--navy);
+        margin-bottom: 18px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .brand img {
+        width: 22px;
+        height: 22px;
+        border-radius: 5px;
+      }
+
+      .brand span {
+        font-family: var(--display);
+        font-size: 18px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--navy);
+      }
+
+      .running {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .sec-kicker {
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 4px;
+      }
+
+      h2.sec {
+        font-family: var(--display);
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: 0.045em;
+        line-height: 0.92;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 12px;
+      }
+
+      .intro {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--fg);
+        margin-bottom: 16px;
+        max-width: 52em;
+      }
+
+      .intro strong {
+        font-weight: 600;
+        color: var(--navy);
+      }
+
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1.5px solid var(--navy);
+        border-radius: 2px;
+        padding: 14px 15px 13px;
+      }
+
+      .card .num {
+        font-family: var(--display);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: var(--navy);
+        margin-bottom: 4px;
+      }
+
+      .card h3 {
+        font-family: var(--display);
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+        color: var(--ink);
+        margin-bottom: 6px;
+      }
+
+      .card p,
+      .card li {
+        font-size: 12px;
+        line-height: 1.42;
+        color: var(--muted);
+      }
+
+      .card ul {
+        padding-left: 1.05em;
+      }
+
+      .card li + li {
+        margin-top: 4px;
+      }
+
+      .card--navy {
+        background: var(--navy);
+        color: var(--on-navy);
+        border-color: var(--navy);
+      }
+
+      .card--navy h3,
+      .card--navy .num {
+        color: var(--on-navy);
+      }
+
+      .card--navy p,
+      .card--navy li {
+        color: rgb(245 240 234 / 84%);
+      }
+
+      .strip {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        margin: 0 0 14px;
+      }
+
+      .strip span {
+        display: block;
+        background: var(--card);
+        border: 1px solid var(--navy);
+        padding: 8px 6px 7px;
+        text-align: center;
+      }
+
+      .strip b {
+        display: block;
+        font-family: var(--display);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--navy);
+      }
+
+      .strip i {
+        font-style: normal;
+        font-size: 9px;
+        color: var(--muted);
+        letter-spacing: 0.02em;
+      }
+
+      table.limits {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 12px;
+        background: var(--card);
+        border: 1.5px solid var(--navy);
+      }
+
+      table.limits th,
+      table.limits td {
+        text-align: left;
+        padding: 8px 10px;
+        font-size: 11.5px;
+        line-height: 1.35;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+
+      table.limits th {
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--navy);
+        background: #ede8df;
+      }
+
+      table.limits tr:last-child td {
+        border-bottom: none;
+      }
+
+      table.limits td:first-child {
+        font-weight: 600;
+        color: var(--navy);
+        width: 28%;
+      }
+
+      .foot {
+        margin-top: auto;
+        padding-top: 12px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+      }
+
+      .callout {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-left: 3px solid var(--navy);
+        background: rgb(12 36 97 / 6%);
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--fg);
+      }
+
+      .callout strong {
+        color: var(--navy);
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 10px;
+        margin: 12px 0 14px;
+      }
+
+      .stat {
+        background: var(--navy);
+        color: var(--on-navy);
+        padding: 14px 14px 12px;
+      }
+
+      .stat b {
+        display: block;
+        font-family: var(--display);
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        line-height: 1;
+        margin-bottom: 6px;
+      }
+
+      .stat span {
+        font-size: 11px;
+        line-height: 1.35;
+        opacity: 0.82;
+      }
+
+      .cite {
+        font-size: 11px;
+        line-height: 1.45;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+
+      .horizon {
+        display: grid;
+        grid-template-columns: 1.15in 1fr;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .horizon:last-of-type {
+        border-bottom: none;
+      }
+
+      .when {
+        font-family: var(--display);
+        font-size: 16px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--navy);
+        line-height: 1.15;
+      }
+
+      .when small {
+        display: block;
+        font-family: var(--body);
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        margin-top: 4px;
+      }
+
+      .horizon h3 {
+        font-family: var(--display);
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--ink);
+        margin-bottom: 4px;
+      }
+
+      .horizon p,
+      .horizon li {
+        font-size: 12px;
+        line-height: 1.42;
+        color: var(--muted);
+      }
+
+      .horizon ul {
+        margin-top: 6px;
+        padding-left: 1.1em;
+      }
+
+      .horizon li + li {
+        margin-top: 3px;
+      }
+
+      .seq {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 8px;
+        margin-top: 8px;
+        align-items: stretch;
+      }
+
+      .seq li {
+        list-style: none;
+        background: var(--card);
+        border: 1px solid var(--navy);
+        padding: 10px 11px 9px;
+      }
+
+      .seq .n {
+        display: block;
+        font-family: var(--display);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        color: var(--navy);
+        margin-bottom: 3px;
+      }
+
+      .seq strong {
+        display: block;
+        font-size: 11.5px;
+        color: var(--navy);
+        font-weight: 600;
+        margin-bottom: 2px;
+      }
+
+      .seq span {
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .two-col-text {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        font-size: 12.5px;
+        line-height: 1.45;
+        color: var(--fg);
+      }
+
+      .two-col-text h3 {
+        font-family: var(--display);
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 6px;
+      }
+
+      .guard {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px 14px;
+        margin-top: 8px;
+      }
+
+      .guard div {
+        padding: 10px 12px;
+        background: var(--card);
+        border: 1px solid var(--line);
+      }
+
+      .guard h4 {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 3px;
+      }
+
+      .guard p {
+        font-size: 11.5px;
+        line-height: 1.38;
+        color: var(--muted);
+      }
+
+      .formula {
+        font-family: var(--body);
+        font-size: 12px;
+        letter-spacing: 0.01em;
+        color: var(--navy);
+        font-weight: 500;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 01 COVER -->
+    <section class="sheet sheet--cover">
+      <aside class="cover-navy">
+        <img src="../frontend/public/icon.png" alt="SkyEye" />
+        <p class="cover-kicker">RescueHacks · Emergency Response</p>
+        <h1>Sky<br />Eye</h1>
+        <dl class="cover-facts">
+          <div>
+            <dt>What it is</dt>
+            <dd>A triage accelerant for missing-person search. Ranked leads. A human verifies.</dd>
+          </div>
+          <div>
+            <dt>What it is not</dt>
+            <dd>Not a finder. Not a confirmation. Not a satellite detector.</dd>
+          </div>
+          <div>
+            <dt>Where we are</dt>
+            <dd>Live console: report → ring → tiled detect on drone photographs.</dd>
+          </div>
+        </dl>
+        <p class="cover-safety">
+          SkyEye surfaces possible leads only. It does not confirm a person’s location or safety. Contact 911 / local SAR immediately.
+        </p>
+      </aside>
+      <div class="cover-cream">
+        <div class="meta-row">
+          <span>Operator briefing</span>
+          <span>August 2026</span>
+        </div>
+        <h2>Next steps,<br />future direction<br />&amp; potential impact</h2>
+        <p class="lede">
+          SkyEye compresses the first hours of a search: unstructured report to a
+          <strong>Lost Person Behavior ring</strong>, drone photograph to
+          <strong>ranked person-shaped candidates</strong>. This note is the post-demo path —
+          what to build next, who it is for, and how impact is measured without claiming a find.
+        </p>
+        <ol class="toc">
+          <li>
+            <span class="n">02</span>
+            <div>
+              <h3>Where we stand</h3>
+              <p>The two loops that already meet on the map, and the measured limits of the current detector.</p>
+            </div>
+          </li>
+          <li>
+            <span class="n">03</span>
+            <div>
+              <h3>Why the hours matter</h3>
+              <p>SAR is time-critical. Drone footage already exists. Review still happens by hand.</p>
+            </div>
+          </li>
+          <li>
+            <span class="n">04</span>
+            <div>
+              <h3>Recommended sequence</h3>
+              <p>Ninety days, twelve months, eighteen months — in the order a field pilot can absorb.</p>
+            </div>
+          </li>
+          <li>
+            <span class="n">05</span>
+            <div>
+              <h3>Detection that matches the altitude</h3>
+              <p>Aerial fine-tune, video ingest, thermal. The three upgrades that change recall.</p>
+            </div>
+          </li>
+          <li>
+            <span class="n">06</span>
+            <div>
+              <h3>Pilot, guardrails, ask</h3>
+              <p>One volunteer chapter. Historical flights first. No operational use until numbers exist.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="tagline">Hours of searching. Minutes to a lead.</p>
+      </div>
+    </section>
+
+    <!-- 02 STANDING -->
+    <section class="sheet sheet--in">
+      <div class="top">
+        <div class="brand">
+          <img src="../frontend/public/icon.png" alt="" />
+          <span>SkyEye</span>
+        </div>
+        <p class="running">Next steps · 02 / 06</p>
+      </div>
+      <p class="sec-kicker">Section 01</p>
+      <h2 class="sec">Where we stand</h2>
+      <p class="intro">
+        The product already does the honest version of the pitch.
+        <strong>Where to look</strong> is a map problem.
+        <strong>What to look at</strong> is a drone-altitude photograph.
+        Commercial satellite imagery tops out around 30–50 cm per pixel — a person is one or two pixels. Those tiles never enter the detector.
+      </p>
+      <div class="strip">
+        <span><b>01 Report</b><i>plain language</i></span>
+        <span><b>02 Extract</b><i>Gemini / Groq</i></span>
+        <span><b>03 Geocode</b><i>last-known</i></span>
+        <span><b>04 LPB ring</b><i>50th percentile</i></span>
+        <span><b>05 Photo</b><i>drone nadir</i></span>
+        <span><b>06 Tiled YOLO</b><i>ONNX · merge</i></span>
+        <span><b>07 Leads</b><i>human reviews</i></span>
+      </div>
+      <div class="grid-2">
+        <article class="card">
+          <p class="num">Loop A — where</p>
+          <h3>Report → search area</h3>
+          <p>
+            Free-text intake. Structured facts: last-known place, elapsed hours, clothing, subject category.
+            Google Geocoding. A simplified Koester 50th-percentile radius:
+          </p>
+          <p class="formula" style="margin: 8px 0 6px">
+            r = clamp( r₅₀ √(t / t₀), 200 m, 8000 m ) · t₀ = 3 h
+          </p>
+          <p>
+            √t keeps the ring from doubling when time doubles. An elderly hiker at 4.5 h gets r ≈ 1.3 km. Heuristic, not an operational plan.
+          </p>
+        </article>
+        <article class="card">
+          <p class="num">Loop B — what</p>
+          <h3>Photograph → ranked candidates</h3>
+          <p>
+            Sliding-window YOLOv8n (ONNX Runtime). Overlapping tiles, letterboxed to native input, projected back, merged across seams. Ranked boxes and map pins when the fixture is georeferenced.
+          </p>
+          <p style="margin-top: 8px">
+            Time-to-first-lead on laptop CPU: about 5–8 s on the slowest demo fixture, inside the 30 s target. UI never says “found.” Zero results are never “the area is clear.”
+          </p>
+        </article>
+      </div>
+      <table class="limits">
+        <thead>
+          <tr>
+            <th>Limit</th>
+            <th>What we measured</th>
+            <th>What it implies next</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Scale floor</td>
+            <td>Pretrained YOLOv8n misses subjects ≤60 px entirely. ≥100 px is reliable. Dropping confidence to 0.05 recovered none of them and added nine false positives. HERIDAL-class people sit at ~30–60 px.</td>
+            <td>Fine-tune on aerial SAR stills. Tiling cannot invent a prior the backbone never saw.</td>
+          </tr>
+          <tr>
+            <td>Pose prior</td>
+            <td><code>lone_surfer_shorebreak</code> never detects at any threshold — prone, nadir, COCO’s upright-person prior. Kept in the corpus on purpose.</td>
+            <td>Aerial labels (prone, partial, occluded) are the fix. Not a lower threshold.</td>
+          </tr>
+          <tr>
+            <td>Tiling tradeoff</td>
+            <td>TILE_SIZE = 320 lifted a controlled scale test from 4/10 to 7/10 recall, at ~2.5× latency and ~5× false positives.</td>
+            <td>Recall lever for demo; a fine-tuned model should need less aggressive tiling.</td>
+          </tr>
+          <tr>
+            <td>True negatives</td>
+            <td>7 of 8 demo fixtures behave as expected. Both canopy true-negatives return zero false positives.</td>
+            <td>Empty-state copy stays. A future model must not “find” trees.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="foot">
+        <span>Vercel UI · Render API · detect stays off Vercel</span>
+        <span>Leads to verify · never confirmations</span>
+      </div>
+    </section>
+
+    <!-- 03 IMPACT -->
+    <section class="sheet sheet--in">
+      <div class="top">
+        <div class="brand">
+          <img src="../frontend/public/icon.png" alt="" />
+          <span>SkyEye</span>
+        </div>
+        <p class="running">Next steps · 03 / 06</p>
+      </div>
+      <p class="sec-kicker">Section 02</p>
+      <h2 class="sec">Why the hours matter</h2>
+      <p class="intro">
+        Impact is not “AI finds missing people.” Impact is a
+        <strong>shorter time-to-first-verifiable-lead</strong>
+        and fewer reviewer-hours spent on empty canopy. Survival in land search declines with duration; planning quality in the first operational period is the difference between a ring that is searchable and one that has already doubled.
+      </p>
+      <div class="stat-row">
+        <div class="stat">
+          <b>51 h</b>
+          <span>Search duration was the strongest survival predictor in a CART analysis of SAR incidents. A 51-hour mark captured nearly all survivors in the derivation set.</span>
+        </div>
+        <div class="stat">
+          <b>&gt;90%</b>
+          <span>Wilderness searches resolved by early reflex tasks. The remainder reward intensive planning — probability maps, effort allocation, updates after each period.</span>
+        </div>
+        <div class="stat">
+          <b>227 h</b>
+          <span>Person-hours spent reviewing 8,399 UAS photographs in one published missing-person case, across 53 reviewers and thousands of hectares.</span>
+        </div>
+      </div>
+      <p class="cite">
+        Adams et al., <em>Wilderness &amp; Environmental Medicine</em> (2007), “Search Is a Time-Critical Event.”
+        Sava et al., <em>Transactions in GIS</em> (2015), evaluating Lost Person Behavior maps; Koester (2008) / ISRID.
+        Díez-González et al., high-resolution aerial photography for missing persons (DOI 10.6036/10631).
+      </p>
+      <div class="grid-3" style="margin-top: 16px">
+        <article class="card">
+          <p class="num">Mechanism 1</p>
+          <h3>A ring from evidence</h3>
+          <p>
+            Dispatch still gets a scared caller and a guessed radius. SkyEye extracts a subject category and elapsed time, then sizes a 50th-percentile LPB ring. That does not replace an incident commander. It gives the first map something other than a round number.
+          </p>
+        </article>
+        <article class="card">
+          <p class="num">Mechanism 2</p>
+          <h3>Pixels, ranked</h3>
+          <p>
+            Volunteer chapters already own drones. The bottleneck is eyes on stills and video. SkyEye does not make a person more present in a frame. It spends a finite attention budget on the most person-shaped pixels first.
+          </p>
+        </article>
+        <article class="card">
+          <p class="num">Mechanism 3</p>
+          <h3>Uncertainty, kept</h3>
+          <p>
+            False certainty kills trust and can pull ground teams to the wrong draw. Ranked scores, a non-dismissible emergency banner, and empty-state copy that refuses “all clear” are part of the impact model, not decoration.
+          </p>
+        </article>
+      </div>
+      <div class="callout">
+        <strong>Who this is for.</strong>
+        Near term: a volunteer SAR coordinator triaging drone stills, or a dispatcher who already called 911 and needs a defensible first ring.
+        Later: mountain, coastal, and wilderness chapters that fly UAS today and still review footage by hand. Not the bystander as a freelance searcher. The product never tells anyone to walk toward a pin.
+      </div>
+      <p class="intro" style="margin: 14px 0 0">
+        We will not report “lives saved.” A responsible scorecard is:
+        time from report (or landing) to first reviewed lead; precision/recall on that chapter’s own imagery; reviewer-hours per km² of coverage; and whether night/thermal extends the window when most searches go dark.
+        Satellite GSD does not move. Detection stays on drone photographs.
+      </p>
+      <div class="foot">
+        <span>Triage accelerant · not a replacement for SAR</span>
+        <span>Leads to verify · never confirmations</span>
+      </div>
+    </section>
+
+    <!-- 04 SEQUENCE -->
+    <section class="sheet sheet--in">
+      <div class="top">
+        <div class="brand">
+          <img src="../frontend/public/icon.png" alt="" />
+          <span>SkyEye</span>
+        </div>
+        <p class="running">Next steps · 04 / 06</p>
+      </div>
+      <p class="sec-kicker">Section 03</p>
+      <h2 class="sec">Recommended sequence</h2>
+      <p class="intro">
+        Build in the order a field chapter can absorb. Do not ship live ingest before the model has seen nadir people, and do not put SkyEye on an active incident before it has been scored on that chapter’s historical flights.
+      </p>
+
+      <div class="horizon">
+        <div class="when">90 days<small>Stabilize · invite</small></div>
+        <div>
+          <h3>Make the demo a tool a coordinator could sit with</h3>
+          <ul>
+            <li><strong>Production detect.</strong> Finish the ONNX Runtime path on Render (no PyTorch in the running image). One Gunicorn worker. Operator Docker rebuild — not a restart. Confirm <code>model.weights = yolov8n.onnx</code>.</li>
+            <li><strong>Regression harness.</strong> Keep the eight-fixture corpus. Treat the 60 px floor and the surfer miss as tests a future weight file must beat without lighting up the canopy true-negatives.</li>
+            <li><strong>One chapter conversation.</strong> Volunteer SAR that already flies. Tabletop only: how they capture, how they review, whether geotags exist. No operational use.</li>
+            <li><strong>Dataset access.</strong> Request HERIDAL and/or SARD (gated). Fine-tune cannot start on Wikimedia substitutes alone.</li>
+            <li><strong>Capture note.</strong> One page for pilots: nadir, overlap, geotags, GSD target so a person is large enough to be a detection problem rather than a physics problem.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="horizon">
+        <div class="when">12 months<small>Detection · ingest</small></div>
+        <div>
+          <h3>Match the altitude SAR actually flies</h3>
+          <ul>
+            <li><strong>Aerial fine-tune</strong> on HERIDAL/SARD so prone, partial, 30–60 px subjects are in-distribution. Hold out a slice; quote a real recall number.</li>
+            <li><strong>Video stills.</strong> Sample frames from footage teams already record. Same <code>/api/detect</code> contract. Cluster in time so one person is not twenty pins.</li>
+            <li><strong>Thermal / IR</strong> only if the partner already carries the payload. Highest leverage for night search; different false-positive profile (rock, livestock, residual heat).</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="horizon">
+        <div class="when">18 months<small>Into the incident</small></div>
+        <div>
+          <h3>Only after numbers on their imagery</h3>
+          <ul>
+            <li><strong>Limited operational trial</strong> on a non-critical training search or after-action review — never as the sole cue for ground teams.</li>
+            <li><strong>Airframe ingest</strong> (DJI SDK / MAVLink) instead of file upload, if the chapter wants it.</li>
+            <li><strong>Multi-report clustering</strong> — several witnesses, one merged ring. Stretch in the original PRD; useful once intake is trusted.</li>
+            <li><strong>Field / offline mode</strong> for trailheads where the cloud is a joke. Same safety copy, local ONNX.</li>
+          </ul>
+        </div>
+      </div>
+
+      <article class="card card--navy" style="margin-top: 12px">
+        <p class="num">What stays out until the sequence says so</p>
+        <h3>Satellite detect · globe-as-product · “found” UX</h3>
+        <p>
+          Running YOLO on a basemap will fail a GIS-literate review in thirty seconds. A decorative globe on the landing page is not a search surface. Changing the frozen <code>/api/detect</code> shape mid-pilot is how the console and the model stop talking. Those are strategy, not backlog shame.
+        </p>
+      </article>
+      <div class="foot">
+        <span>Detection stays on drone photographs</span>
+        <span>Leads to verify · never confirmations</span>
+      </div>
+    </section>
+
+    <!-- 05 DETECTION HORIZON -->
+    <section class="sheet sheet--in">
+      <div class="top">
+        <div class="brand">
+          <img src="../frontend/public/icon.png" alt="" />
+          <span>SkyEye</span>
+        </div>
+        <p class="running">Next steps · 05 / 06</p>
+      </div>
+      <p class="sec-kicker">Section 04</p>
+      <h2 class="sec">Detection that matches the altitude</h2>
+      <p class="intro">
+        Pretrained COCO is a street-level, upright-person prior. Wilderness SAR is nadir, small, often prone, often partial. The next model work is not a bigger prompt. It is labels that look like the job.
+      </p>
+      <div class="grid-3">
+        <article class="card">
+          <p class="num">Upgrade A</p>
+          <h3>Aerial fine-tune</h3>
+          <p>
+            HERIDAL, SARD, optionally C2A. Purpose-built drone-altitude boxes. Train so the 60 px floor moves down into the 30–60 px band where those datasets live.
+          </p>
+          <p style="margin-top: 8px">
+            <strong style="color: var(--navy)">Done looks like:</strong> held-out recall quoted in the README; surfer-class poses no longer a permanent miss; canopy true-negatives still clean; tiling less aggressive for the same recall.
+          </p>
+        </article>
+        <article class="card">
+          <p class="num">Upgrade B</p>
+          <h3>Video ingest</h3>
+          <p>
+            Teams do not hand you one JPEG. They land with a card of 4K. Sample ~1 fps (or keyframes), run the existing detector, stitch boxes that persist across frames, drop flicker.
+          </p>
+          <p style="margin-top: 8px">
+            <strong style="color: var(--navy)">Done looks like:</strong> an operator can drop an MP4, get a timeline of leads, jump to the frame, see the same safety banner. Not a live siren from the aircraft.
+          </p>
+        </article>
+        <article class="card">
+          <p class="num">Upgrade C</p>
+          <h3>Thermal / IR</h3>
+          <p>
+            The original PRD called this the highest-impact real-world upgrade: most searches continue after dark, when EO stills go useless. Thermal is a different sensor and a different error mode.
+          </p>
+          <p style="margin-top: 8px">
+            <strong style="color: var(--navy)">Done looks like:</strong> a second weight file, dual-mode UI, calibrated scores, and a partner who already owns the payload. Do not buy a camera to demo a story.
+          </p>
+        </article>
+      </div>
+      <div class="two-col-text" style="margin-top: 16px">
+        <div>
+          <h3>How we will refuse to overfit the demo</h3>
+          <p>
+            The Wikimedia corpus is openly licensed and the right kind of hard — people a few dozen pixels across canopy — but it is not HERIDAL. Demo-placed pins on the Bruce Trail / Milton conservation area are labeled as such. A partner trial uses <em>their</em> geotagged stills, or it does not project to the map.
+          </p>
+          <p style="margin-top: 8px">
+            Fine-tune success is not “more boxes on the beach fixture.” It is recall on held-out aerial people <em>and</em> an unchanged empty canopy. If precision collapses, we did not ship a rescue tool; we shipped a hallucination with GPS.
+          </p>
+        </div>
+        <div>
+          <h3>Engineering that must not regress</h3>
+          <p>
+            Render’s 2 GB class killed a full PyTorch stack (status 137). Runtime stays ONNX, one worker, tight threads. Weights bake into the image. The browser talks to Render directly — Vercel Hobby will time out tiled CPU detect.
+          </p>
+          <p style="margin-top: 8px">
+            <code>/api/detect</code> stays a ranked list of boxes, scores, optional lat/lng. Video is extra frames of the same object. Thermal is another model behind the same shape. Keys stay off the wire and out of logs. Rate limits stay on extract, geocode, and detect.
+          </p>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>CRASAR-shaped lesson.</strong>
+        Wide-area drone search already produces tens of gigabytes that humans cannot finish. Computer vision on that pile is useful only when flights are nadir, overlapping, and geotagged for post-processing — not ad-hoc video shot “in case.” SkyEye’s capture note exists so a chapter does not collect the wrong data and then blame the model.
+      </div>
+      <div class="foot">
+        <span>HERIDAL / SARD / C2A remain request-gated</span>
+        <span>Leads to verify · never confirmations</span>
+      </div>
+    </section>
+
+    <!-- 06 PILOT -->
+    <section class="sheet sheet--in">
+      <div class="top">
+        <div class="brand">
+          <img src="../frontend/public/icon.png" alt="" />
+          <span>SkyEye</span>
+        </div>
+        <p class="running">Next steps · 06 / 06</p>
+      </div>
+      <p class="sec-kicker">Section 05</p>
+      <h2 class="sec">Pilot, guardrails, ask</h2>
+      <p class="intro">
+        The post-hackathon path in the PRD is unchanged: a partnership with a volunteer SAR chapter that already owns drones and still reviews footage manually. One chapter. Historical flights first. A human always between SkyEye and the ground team.
+      </p>
+      <div class="grid-2" style="margin-bottom: 14px">
+        <article class="card">
+          <p class="num">Pilot design</p>
+          <h3>What we run</h3>
+          <ul>
+            <li>De-identified stills or sampled video from a closed search or a training exercise.</li>
+            <li>Blind review: coordinator marks leads they would have flagged by hand; we compare time-to-first-lead and missed persons in-frame.</li>
+            <li>Map pins only where EXIF/flight logs support them. No demo-placement in a trial write-up.</li>
+            <li>Stop rule: if false positives bury the list, we do not “tune the demo” — we report the miss and go back to weights or tiling.</li>
+          </ul>
+        </article>
+        <article class="card">
+          <p class="num">Scorecard</p>
+          <h3>What we publish</h3>
+          <ul>
+            <li>Recall / precision on that chapter’s holdout, with the 60 px and pose cases called out.</li>
+            <li>Seconds from ingest to first reviewed candidate vs. their current practice.</li>
+            <li>Reviewer-minutes per km² before and after ranking.</li>
+            <li>A written statement that SkyEye was not used to clear ground or to withhold a search.</li>
+          </ul>
+        </article>
+      </div>
+      <h3 class="sec" style="font-size: 22px; margin-bottom: 8px">Guardrails that do not expire</h3>
+      <div class="guard">
+        <div>
+          <h4>Language</h4>
+          <p>No “found,” “located,” or “confirmed” in the product. Confidence is always visible. Empty is not clear.</p>
+        </div>
+        <div>
+          <h4>Action</h4>
+          <p>No feature suggests a bystander walk to a pin. Emergency / local SAR contact stays on every result screen.</p>
+        </div>
+        <div>
+          <h4>Sensor</h4>
+          <p>No detector on map or satellite tiles. GSD is physics. The workaround is altitude, not marketing.</p>
+        </div>
+        <div>
+          <h4>Data</h4>
+          <p>No live surveillance corpus. Partner imagery stays theirs. Keys never in git, responses, or logs.</p>
+        </div>
+      </div>
+      <article class="card card--navy" style="margin-top: 14px">
+        <p class="num">The ask</p>
+        <h3>One chapter · historical flights · a reviewer</h3>
+        <p>
+          Access to HERIDAL or SARD so the model’s prior matches nadir SAR.
+          A volunteer chapter willing to sit through a tabletop, then a scored replay of flights they already flew.
+          Permission to quote aggregate metrics, not subjects’ names.
+          After that, and only after that: a conversation about video, thermal, and whether SkyEye belongs on the next training search.
+        </p>
+      </article>
+      <ol class="seq">
+        <li>
+          <b class="n">01</b>
+          <strong>This week</strong>
+          <span>Production ONNX on Render. Leave extract, geocode, and the map contract as they are.</span>
+        </li>
+        <li>
+          <b class="n">02</b>
+          <strong>This quarter</strong>
+          <span>HERIDAL/SARD request, one SAR tabletop, and a one-page capture protocol.</span>
+        </li>
+        <li>
+          <b class="n">03</b>
+          <strong>This year</strong>
+          <span>Fine-tune with a published holdout number. Video stills on partner footage.</span>
+        </li>
+        <li>
+          <b class="n">04</b>
+          <strong>After the number</strong>
+          <span>Thermal if they carry the payload. Airframe ingest if they want it. Never “all clear.”</span>
+        </li>
+      </ol>
+      <div class="foot">
+        <span>August 2026 · RescueHacks · Emergency Response / Community Rescue</span>
+        <span>SkyEye · briefing 06 / 06</span>
+      </div>
+    </section>
+  </body>
+</html>
