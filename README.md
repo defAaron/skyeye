@@ -36,7 +36,7 @@ Quote these numbers rather than implying the detector is better than it is:
 | Layer | Tool |
 |-------|------|
 | Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`, `/api/extract`) |
-| Detection | YOLOv8n via Ultralytics, sliding-window tiling + IoU/containment merge |
+| Detection | YOLOv8n ONNX (ONNX Runtime), sliding-window tiling + IoU/containment merge |
 | Intake | Gemini Flash (primary: 3.6 / 3.5-lite / 3.5 / 3.1-lite), Groq GPT-OSS 20B (fallback) |
 | Geocoding | Google Maps Geocoding API (server-side) |
 | Map | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
@@ -155,7 +155,7 @@ The API contract in [docs/api-contract.md](./docs/api-contract.md) is frozen: ch
 
 ## Deploy
 
-Production is **Vercel** (Vite UI) + **Render** (Flask + YOLOv8n). The browser calls Render directly — do not proxy `/api` through Vercel, or detect will time out. Render needs **2 GB RAM** (Standard); 512 MB plans OOM when the model loads.
+Production is **Vercel** (Vite UI) + **Render** (Flask + YOLOv8n ONNX). The browser calls Render directly — do not proxy `/api` through Vercel, or detect will time out. The API image does not ship PyTorch; detect loads ONNX Runtime instead.
 
 Step-by-step, env vars, and the live smoke list: [docs/deploy.md](./docs/deploy.md). Blueprint: [render.yaml](./render.yaml).
 

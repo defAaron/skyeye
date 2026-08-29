@@ -1,8 +1,8 @@
 # Render Blueprint — API only. The Vite UI lives on Vercel.
 # https://render.com/docs/blueprint-spec
 #
-# Free (512 MB) and Starter (512 MB) will OOM once PyTorch + YOLOv8n load.
-# Use Standard / 1c-2g (2 GB) at minimum; Pro / 2c-4g if detect is slow.
+# Runtime is ONNX Runtime, not PyTorch. Starter (512 MB) can run detect;
+# Standard is still nicer if the box is also serving extract + geocode.
 
 services:
   - type: web
@@ -18,7 +18,7 @@ services:
       - key: YOLO_DEVICE
         value: cpu
       - key: YOLO_WEIGHTS
-        value: /app/yolov8n.pt
+        value: /app/yolov8n.onnx
       - key: CORS_ORIGIN
         sync: false
       - key: CORS_ORIGIN_REGEX

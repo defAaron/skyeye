@@ -96,8 +96,16 @@ def detect():
     conf = _parse_conf()
 
     from detection.infer import detect_image, detections_payload
+    from detection.model import ModelUnavailableError
 
-    detections, tiles = detect_image(image, conf=conf)
+    try:
+        detections, tiles = detect_image(image, conf=conf)
+    except ModelUnavailableError as exc:
+        raise ApiError(
+            503,
+            "MODEL_UNAVAILABLE",
+            "The detection model is not available yet.",
+        ) from exc
     geo = meta_geo(sample_entry) if source == "sample" else None
     payload = apply_geo(detections_payload(detections), image.width, image.height, geo)
 

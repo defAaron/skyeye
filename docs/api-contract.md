@@ -17,7 +17,7 @@ skyeye/
 │   ├── config.py               # env-backed settings (limits, weights, CORS)
 │   ├── ratelimit.py            # in-process sliding-window + Gemini/Groq/Maps budgets
 │   ├── gunicorn.conf.py        # 1 gthread worker, 180s timeout (Render)
-│   ├── Dockerfile              # CPU torch + fixtures + weights
+│   ├── Dockerfile              # ONNX export stage + slim runtime + fixtures
 │   ├── requirements.txt
 │   ├── api/
 │   │   ├── __init__.py
@@ -35,7 +35,8 @@ skyeye/
 │   │   └── project.py          # pixel → lat/lng for georeferenced samples
 │   ├── detection/
 │   │   ├── __init__.py
-│   │   ├── model.py            # lazy YOLO load, person-class filter
+│   │   ├── model.py            # lazy ONNX YOLO load, person-class filter
+│   │   ├── onnx_infer.py       # letterbox + NMS (no PyTorch)
 │   │   ├── tiling.py           # sliding window + box projection
 │   │   ├── merge.py            # IoU/NMS merge across tiles
 │   │   └── infer.py            # detect_full_image() + CLI
@@ -342,12 +343,12 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed browser origins, comma-separated |
 | `CORS_ORIGIN_REGEX` | _(empty)_ | Optional extra origin regex (e.g. Vercel previews) |
 | `TRUST_PROXY` | unset / false | `1` on Render so ProxyFix rewrites `remote_addr` from the proxy hop |
-| `YOLO_WEIGHTS` | `yolov8n.pt` | Weights path; swapped by Step 1.5 if fine-tuning happens |
+| `YOLO_WEIGHTS` | `yolov8n.pt` | `.pt` locally (exports `.onnx` once) or `/app/yolov8n.onnx` on Render |
 | `YOLO_DEVICE` | `cpu` | `cpu`, `mps`, or `cuda` |
 | `CONF_THRESHOLD` | `0.25` | Default confidence floor |
 | `TILE_SIZE` | `640` | Sliding-window tile edge in pixels |
 | `TILE_OVERLAP` | `0.2` | Fractional tile overlap |
-| `TILE_BATCH_SIZE` | `4` | Tiles per YOLO forward |
+| `TILE_BATCH_SIZE` | `1` | Tiles per ONNX forward |
 | `TORCH_NUM_THREADS` | `1` | PyTorch/OMP threads. `1` avoids a 137 OOM on a 2 GB instance |
 | `DETECT_MAX_PIXELS` | `2500000` | Working resolution for detect. Larger images are downscaled, then boxes are mapped back |
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |

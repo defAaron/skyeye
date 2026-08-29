@@ -16,7 +16,7 @@ from PIL import Image
 
 from config import DISCLAIMER, settings
 from detection.merge import merge_detections
-from detection.model import PERSON_CLASS_NAME, get_model, person_class_ids
+from detection.model import PERSON_CLASS_NAME, get_model
 from detection.tiling import Tile, iter_tiles, project_box, tile_grid
 from detection.types import Detection
 
@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 # and are the usual status-137 on a 2 GB Render box.
 _infer_lock = threading.RLock()
 
-# Tiles per model call. Four 640px crops are cheap; one-at-a-time on a 10 MP
-# aerial is what blows the 180s client budget on Render CPU.
+# One tile per ONNX run keeps peak RSS low. The 2.5 MP working-resolution cap
+# is what keeps tile count inside the 180s client budget.
 MAX_TILE_BATCH_SIZE = 8
 
 # YOLOv8's native input size.
@@ -78,69 +78,22 @@ def _detections_to_original(
     return scaled
 
 
-def _infer_imgsz() -> int:
-    """Model input size, deliberately decoupled from the tile size.
-
-    A tile is never fed to the model smaller than the network's native size, so setting
-    `TILE_SIZE` below 640 upscales each crop and makes small people bigger in network
-    pixels (the usual small-object recall lever) instead of just shrinking the input.
-    Tiles larger than that are kept at full detail rather than downscaled.
-    """
-    return int(math.ceil(max(MODEL_IMGSZ, int(settings.tile_size)) / 32) * 32)
-
-
-def _target_class_ids(model) -> list[int]:
-    """Class ids we are allowed to emit — person only."""
-    ids = person_class_ids(model)
-    if ids:
-        return ids
-    # A single-class aerial-person fine-tune may label its only class something other
-    # than "person". Anything with more classes we refuse rather than risk emitting
-    # non-person candidates.
-    names = getattr(model, "names", {}) or {}
-    if len(names) == 1:
-        return [int(next(iter(names)))]
-    return []
-
-
-def _predict(model, images: Sequence[Image.Image], conf: float, class_ids: Sequence[int]):
-    return model.predict(
-        list(images),
-        conf=conf,
-        imgsz=_infer_imgsz(),
-        device=settings.device,
-        classes=list(class_ids),
-        verbose=False,
-    )
-
-
-def _detections_from_result(
-    result,
-    allowed: set[int],
+def _project_local(
+    detections: Sequence[Detection],
     offset_x: int,
     offset_y: int,
     width: int,
     height: int,
 ) -> list[Detection]:
-    boxes = getattr(result, "boxes", None)
-    if boxes is None or len(boxes) == 0:
-        return []
-
-    xyxy = boxes.xyxy.cpu().numpy()
-    confs = boxes.conf.cpu().numpy()
-    classes = boxes.cls.cpu().numpy().astype(int)
-
     out: list[Detection] = []
-    for row, confidence, class_id in zip(xyxy, confs, classes):
-        if int(class_id) not in allowed:
-            continue
-        bbox = project_box(row, offset_x, offset_y, width, height)
+    for detection in detections:
+        bbox = project_box(detection.bbox_xyxy, offset_x, offset_y, width, height)
         if bbox[2] <= bbox[0] or bbox[3] <= bbox[1]:
             continue
         out.append(
             Detection(
                 bbox_xyxy=bbox,
-                confidence=float(confidence),
+                confidence=detection.confidence,
                 class_name=PERSON_CLASS_NAME,
             )
         )
@@ -175,19 +128,7 @@ def detect_full_image(image: Image.Image, conf: float) -> list[Detection]:
     with _infer_lock:
         image = _as_rgb(image)
         model = get_model()
-        class_ids = _target_class_ids(model)
-        if not class_ids:
-            logger.warning("weights %s expose no person class; returning no detections", settings.weights)
-            return []
-
-        results = _predict(model, [image], conf, class_ids)
-        allowed = set(class_ids)
-        detections: list[Detection] = []
-        for result in results:
-            detections.extend(
-                _detections_from_result(result, allowed, 0, 0, image.width, image.height)
-            )
-        return _sorted_desc(detections)
+        return _sorted_desc(_project_local(model.infer(image, conf), 0, 0, image.width, image.height))
 
 
 def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]:
@@ -213,22 +154,18 @@ def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]
             )
 
         model = get_model()
-        class_ids = _target_class_ids(model)
-        if not class_ids:
-            logger.warning("weights %s expose no person class; returning no detections", settings.weights)
-            return [], tiles
-
-        allowed = set(class_ids)
         raw: list[Detection] = []
         for batch in _batched(iter_tiles(work), _tile_batch_size()):
-            results = _predict(model, [tile.image for tile in batch], conf, class_ids)
-            for tile, result in zip(batch, results):
+            for tile in batch:
                 raw.extend(
-                    _detections_from_result(
-                        result, allowed, tile.offset_x, tile.offset_y, work.width, work.height
+                    _project_local(
+                        model.infer(tile.image, conf),
+                        tile.offset_x,
+                        tile.offset_y,
+                        work.width,
+                        work.height,
                     )
                 )
-            del results, batch
 
         merged = _sorted_desc(
             _detections_to_original(

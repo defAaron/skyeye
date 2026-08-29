@@ -9,18 +9,17 @@ seconds (the client already waits up to 180s).
 | Piece | Where | Notes |
 |-------|--------|--------|
 | Vite + React UI | **Vercel** | Root Directory = `frontend` |
-| Flask + YOLOv8n | **Render** web service | Docker, **Standard / 1c-2g (2 GB) minimum** |
+| Flask + YOLOv8n ONNX | **Render** web service | Docker. ONNX Runtime (no PyTorch in the running image) |
 | Maps JS key | Vercel env | HTTP referrer restriction includes the Vercel origin |
 | Geocoding + Gemini/Groq keys | Render env | Server-side only. Never put these on Vercel |
 
-**512 MB plans will OOM.** Free and Starter are 512 MB. PyTorch + YOLOv8n need
-about 2 GB. Render emails **Exited with status 137** when the Linux OOM killer
-SIGKILLs gunicorn on first detect — health and geocode still work until that
-load. If detect is still slow after deploy, bump to Pro / 2c-4g.
+The running image does **not** install PyTorch. Weights are exported to
+`yolov8n.onnx` at build time. That is what keeps detect under Render's memory
+cap (status 137 was the OOM killer loading `torch` + Ultralytics).
 
-Render's free instance also spins down. A cold start then downloads nothing
+Render's free instance still spins down. A cold start then downloads nothing
 (weights and fixtures are baked into the image) but the first detect still
-warms the model and can take a minute.
+warms the ONNX session.
 
 ## 1. Render API
 
@@ -53,6 +52,7 @@ curl -sS https://YOUR-SERVICE.onrender.com/api/health
 ```
 
 `status` should be `"ok"`. `model.loaded` stays `false` until the first detect.
+`model.weights` is `yolov8n.onnx`.
 
 ## 2. Vercel frontend
 
