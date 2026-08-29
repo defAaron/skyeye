@@ -2,19 +2,25 @@
 
 AI-assisted missing person search & rescue tool for **RescueHacks** (Emergency Response / Community Rescue track).
 
-SkyEye compresses the SAR triage pipeline: a vision model scans drone-altitude imagery for human-shaped candidates and returns ranked, explicitly-scored bounding boxes for a human responder to verify.
+SkyEye compresses the SAR triage pipeline: extract a free-text report, draw a Lost Person Behavior search ring, and scan drone-altitude photographs for human-shaped candidates. Ranked, scored boxes go to a human responder to verify.
 
 > **SkyEye does not replace SAR teams, dispatchers, or law enforcement.** It is a triage accelerant that narrows "where do we look first" from hours to minutes. Every output is a *lead to verify*, not a confirmed location.
 
-## What is built right now
+## What is shipped
 
-This repo currently implements the **core detection loop**, a **search-area map**, and **LLM report intake**:
+This is the RescueHacks demo — a landing page, an operator console, and a live API.
 
 **free-text report → Gemini/Groq extract → last-known location → geocode → Lost Person Behavior radius → Google Map pins**
 
-**image in → tiled YOLOv8 inference → ranked person-shaped candidates → human review**
+**drone photograph in → tiled YOLOv8n (ONNX) → ranked person-shaped candidates → human review**
 
-Not built yet: globe view, video upload. Detection still runs only on drone-altitude photographs. Map tiles are never detector input. Full product vision lives in [docs/PRD_TRD.md](./docs/PRD_TRD.md).
+| Surface | What you get |
+|---------|----------------|
+| `/` | Landing. Decorative globe only — not a search map. |
+| `/app` | Operator console: report intake, search ring, fixture picker, JPEG/PNG upload, boxes + pins. |
+| API | Flask on port **5001** locally; Render Docker in production. Detect is ONNX Runtime. No PyTorch in the running image. |
+
+Not in this build (and not claimed): video / live drone ingest, globe-as-product, satellite or map-tile detection, HERIDAL/SARD fine-tune. Map tiles are never detector input. Post-hackathon path: [docs/skyeye-next-steps.pdf](./docs/skyeye-next-steps.pdf). Original spec: [docs/PRD_TRD.md](./docs/PRD_TRD.md).
 
 ## The honest constraint, up front
 
@@ -36,19 +42,20 @@ Quote these numbers rather than implying the detector is better than it is:
 | Layer | Tool |
 |-------|------|
 | Backend | Flask (`/api/health`, `/api/samples`, `/api/detect`, `/api/geocode`, `/api/extract`) |
-| Detection | YOLOv8n ONNX (ONNX Runtime), sliding-window tiling + IoU/containment merge |
-| Intake | Gemini Flash (primary: 3.6 / 3.5-lite / 3.5 / 3.1-lite), Groq GPT-OSS 20B (fallback) |
+| Detection | YOLOv8n via **ONNX Runtime** (never `torch` at request time), sliding-window tiling + IoU/containment merge |
+| Intake | Gemini Flash (primary: 3.6 / 3.5-lite / 3.5 / 3.1-lite, then `gemini-flash-latest`), Groq GPT-OSS 20B then 120B (fallback) |
 | Geocoding | Google Maps Geocoding API (server-side) |
 | Map | Google Maps JavaScript API via `@vis.gl/react-google-maps` |
 | Search radius | Simplified Lost Person Behavior 50th-percentile table |
-| Frontend | Vite + React + TypeScript |
+| Frontend | Vite + React + TypeScript. Landing + console at `/app`. Decorative Three.js globe on `/` only. |
 | Demo corpus | 8 openly licensed Wikimedia Commons drone photographs |
+| Deploy | Vercel (UI) + Render Docker (API). Browser → Render directly. |
 
 Maps keys are required for the search-area map. Gemini or Groq is required for free-text extract. Detection still runs without either.
 
 ## Setup
 
-Requires **Python 3.11** and **Node 20+**. Python 3.13/3.14 will not work — PyTorch has no wheels for them yet.
+Requires **Python 3.11** (matches the Docker image) and **Node 20+**. The API runtime is ONNX Runtime, not PyTorch.
 
 ### 1. Backend
 
@@ -66,7 +73,15 @@ venv/bin/python fixtures/fetch_fixtures.py   # download the demo corpus (~32 MB)
 venv/bin/python app.py
 ```
 
-Backend serves on **http://127.0.0.1:5001**. Port 5000 is avoided because macOS AirPlay Receiver squats on it. Model weights (`yolov8n.pt`) download automatically on first inference.
+Backend serves on **http://127.0.0.1:5001**. Port 5000 is avoided because macOS AirPlay Receiver squats on it. Detect loads **ONNX Runtime** (`yolov8n.onnx`). If that file is missing, the first detect tries a one-time Ultralytics export from `yolov8n.pt` — that extra is **not** in `requirements.txt`. Either copy an onnx next to the backend, or once:
+
+```bash
+venv/bin/python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+venv/bin/python -m pip install ultralytics onnx
+venv/bin/python -c "from ultralytics import YOLO; YOLO('yolov8n.pt').export(format='onnx', imgsz=640, simplify=True)"
+```
+
+Production never exports at runtime. The Docker image bakes `yolov8n.onnx` in a throwaway stage, then runs without PyTorch.
 
 ### 2. Frontend
 
@@ -113,7 +128,7 @@ Prints the same JSON shape the API returns.
 
 ## 30-second demo script
 
-1. **Open the UI.** Point at the amber banner: every result is a lead to verify, never a confirmation. It cannot be dismissed.
+1. **Open `/` then the console.** Landing is the pitch. **Open console** goes to `/app`. Point at the amber banner: every result is a lead to verify, never a confirmation. It cannot be dismissed.
 2. **Say the honest thing first** (10s): "Satellite imagery can't resolve a person — they're one or two pixels. So we detect on drone-altitude imagery, which is where SAR drones actually fly. The map is only for last-known location and a search ring."
 3. **Extract the prefilled report.** The caller text is already in the box (Bruce Trail, Milton, dad, 70, red jacket). Hit Extract. Show the structured fields: last-known place, ~4.5 hours, elderly hiker. Say they are a starting point to review, not verified facts. The search form fills and the map geocodes automatically.
 4. **Read the ring.** A last-known pin and an ~1.3 km Lost Person Behavior ring appear. Note it is a simplified 50th-percentile heuristic, not operational planning.
@@ -126,21 +141,25 @@ Optional, if there is time: `Busy beachfront` shows tiling and cross-tile merge 
 ## Architecture
 
 ```
-frontend/                     Vite + React testing UI
+frontend/                     Vite + React
+  src/Root.tsx                `/` landing · `/app` console
+  src/landing/                LandingPage, decorative GlobeScene (Three.js)
   src/components/             SafetyBanner, ReportIntake, SearchArea, SearchMap,
-                              SamplePicker, UploadZone, DetectionOverlay, DetectionList
+                              DetectPanel, SamplePicker, UploadZone,
+                              DetectionOverlay, DetectionList
   src/api/client.ts           typed fetch wrappers, 180s abort
 backend/
   app.py                      Flask app factory
-  config.py                   env-backed settings
+  config.py                   env-backed settings (version 0.3.0)
   ratelimit.py                in-process sliding-window + Gemini/Groq/Maps budgets
-  gunicorn.conf.py            production server (Render)
-  Dockerfile                  CPU torch image, fixtures + weights baked in
+  gunicorn.conf.py            1 gthread worker, 180s timeout (Render)
+  Dockerfile                  export stage → yolov8n.onnx; slim runtime, no torch
   api/                        health, samples, detect, geocode, extract, error shape
-  extract/                    Gemini primary, Groq fallback, field normalize
+  extract/                    Gemini primary, Groq GPT-OSS fallback, field normalize
   geo/                        LPB radius, Google geocoder, pixel→lat/lng
   detection/
-    model.py                  lazy YOLO load, person-class filter
+    model.py                  lazy ONNX session, person-class filter (no torch import)
+    onnx_infer.py             letterbox + NMS
     tiling.py                 sliding window + box projection
     merge.py                  IoU + containment NMS across tile seams
     infer.py                  detect_full_image, detect_image, CLI
@@ -148,10 +167,12 @@ backend/
 scripts/                      smoke.py, bench.py
 docs/
   api-contract.md             frozen request/response shapes
-  PRD_TRD.md                  full product + technical requirements
+  PRD_TRD.md                  product + technical requirements (shipped vs stretch)
+  deploy.md                   Vercel UI + Render API
+  skyeye-next-steps.pdf       post-hackathon briefing
 ```
 
-The API contract in [docs/api-contract.md](./docs/api-contract.md) is frozen: change it there before changing code on either side.
+The API contract in [docs/api-contract.md](./docs/api-contract.md) is frozen: change it there before changing code on either side. Pipeline diagram: [docs/demo-architecture-flowchart.png](./docs/demo-architecture-flowchart.png).
 
 ## Deploy
 
@@ -161,7 +182,7 @@ Step-by-step, env vars, and the live smoke list: [docs/deploy.md](./docs/deploy.
 
 ## Safety and responsible design
 
-- Non-dismissible banner on every screen: *"SkyEye surfaces possible leads only. It does not confirm a person's location or safety. Contact 911 / local SAR immediately."*
+- Non-dismissible banner on the console; the same sentence is in the landing footer: *"SkyEye surfaces possible leads only. It does not confirm a person's location or safety. Contact 911 / local SAR immediately."*
 - Confidence is always shown explicitly. The words "found", "located", and "confirmed" appear nowhere in the UI.
 - Zero results are never reported as "the area is clear".
 - No feature suggests the user personally investigate a detection.

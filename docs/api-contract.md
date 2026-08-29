@@ -2,7 +2,9 @@
 
 Frozen for this build: **image in → ranked person-shaped candidates out → human review**, plus **report text → LLM extract → geocode + LPB radius → map pins**.
 
-This document is the single source of truth for request/response shapes. No agent may change a shape here without editing this file in the same change. Globe view and video upload are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md).
+This document is the single source of truth for request/response shapes. No agent may change a shape here without editing this file in the same change. Globe-as-product and video upload are **not** part of this contract; see [PRD_TRD.md](PRD_TRD.md). The landing page may show a decorative globe — that is not detector input and not an API.
+
+**Shipped runtime:** `/api/detect` uses **ONNX Runtime** (YOLOv8n). PyTorch is not imported while serving requests. `model.weights` in JSON is the basename of `YOLO_WEIGHTS` (`yolov8n.onnx` on Render; a local `.pt` path still labels `.pt` even when a sibling `.onnx` is what loaded).
 
 **Imagery rule:** detection runs on drone-altitude photos. Satellite/map tiles cannot resolve a person (~30–50 cm/pixel makes a human 1–2 pixels), so they are never detector input. Google Maps is a geocoding and display layer only.
 
@@ -17,7 +19,7 @@ skyeye/
 │   ├── config.py               # env-backed settings (limits, weights, CORS)
 │   ├── ratelimit.py            # in-process sliding-window + Gemini/Groq/Maps budgets
 │   ├── gunicorn.conf.py        # 1 gthread worker, 180s timeout (Render)
-│   ├── Dockerfile              # ONNX export stage + slim runtime + fixtures
+│   ├── Dockerfile              # export stage → yolov8n.onnx; runtime has no torch
 │   ├── requirements.txt
 │   ├── api/
 │   │   ├── __init__.py
@@ -47,15 +49,20 @@ skyeye/
 │   ├── package.json
 │   ├── vite.config.ts          # /api proxy → Flask (dev)
 │   ├── vercel.json             # /app → index.html
-│   └── src/
+│   ├── src/
 │       ├── main.tsx
+│       ├── Root.tsx            # `/` landing, `/app` console
 │       ├── App.tsx
 │       ├── api/client.ts       # typed fetch wrappers
 │       ├── types.ts            # mirrors this contract
-│       └── components/         # SafetyBanner, SamplePicker, DetectionOverlay, ...
+│       ├── landing/            # LandingPage + decorative globe
+│       └── components/         # SafetyBanner, ReportIntake, SearchMap, DetectPanel, ...
 └── docs/
     ├── api-contract.md
-    └── PRD_TRD.md
+    ├── PRD_TRD.md
+    ├── deploy.md
+    ├── demo-architecture-flowchart.html
+    └── skyeye-next-steps.pdf
 ```
 
 Ownership (one agent per area per step): `backend/detection/` = ML, `backend/app.py` + `backend/api/` = Backend, `frontend/src/` = Frontend, `backend/fixtures/` = Data.
@@ -96,12 +103,14 @@ All errors use one shape and never leak filesystem paths, stack traces, or confi
 | 400 | `EXTRACT_INCOMPLETE` | Model returned JSON with no usable `location_text` |
 | 404 | `SAMPLE_NOT_FOUND` | Unknown `sample_id` |
 | 404 | `GEOCODE_NOT_FOUND` | Google returned zero results for that text |
+| 404 | `NOT_FOUND` | Unknown URL (Flask 404 handler) |
+| 405 | `METHOD_NOT_ALLOWED` | Wrong HTTP method for a known path |
 | 413 | `FILE_TOO_LARGE` | Upload exceeds `MAX_UPLOAD_BYTES` |
 | 413 | `IMAGE_TOO_LARGE` | Decoded pixels exceed `MAX_IMAGE_PIXELS` |
-| 500 | `INFERENCE_FAILED` | Model load or inference error |
+| 500 | `INTERNAL_ERROR` | Unhandled exception. Never leaks a traceback. Detect does not emit a separate `INFERENCE_FAILED` code. |
 | 502 | `GEOCODE_FAILED` | Geocoding provider error (no key leaked) |
 | 502 | `EXTRACT_FAILED` | Gemini and Groq both failed (no key leaked) |
-| 503 | `MODEL_UNAVAILABLE` | Weights missing / not yet downloaded |
+| 503 | `MODEL_UNAVAILABLE` | ONNX weights missing on disk (and no `.pt` present to export from) |
 | 503 | `GEOCODE_UNAVAILABLE` | `GOOGLE_MAPS_API_KEY` unset, or provider denied the request |
 | 503 | `EXTRACT_UNAVAILABLE` | Neither `GEMINI_API_KEY` nor `GROQ_API_KEY` set, or both providers denied the request |
 | 429 | `RATE_LIMITED` | Per-IP or provider budget exceeded. `Retry-After` is set to seconds until a slot frees. |
@@ -116,7 +125,7 @@ Liveness plus enough capability info for the UI to warn early.
 {
   "status": "ok",
   "version": "0.3.0",
-  "model": { "loaded": false, "weights": "yolov8n.pt", "device": "cpu" },
+  "model": { "loaded": false, "weights": "yolov8n.onnx", "device": "cpu" },
   "geocode": { "configured": false },
   "extract": { "configured": false, "gemini": false, "groq": false },
   "limits": {
@@ -127,7 +136,7 @@ Liveness plus enough capability info for the UI to warn early.
 }
 ```
 
-`model.loaded` is `false` until the first detect request warms the model (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth. `geocode.configured` is `true` when `GOOGLE_MAPS_API_KEY` is non-empty — the key itself is never returned. `extract.gemini` / `extract.groq` are `true` when the matching key is non-empty. `extract.configured` is `true` when either provider key is set. Keys are never returned.
+`model.loaded` is `false` until the first detect request warms the ONNX session (lazy load). `status` is `"ok"` whenever the process serves requests; it never depends on model warmth. `model.weights` is `Path(YOLO_WEIGHTS).name` — on Render this is `yolov8n.onnx`. `geocode.configured` is `true` when `GOOGLE_MAPS_API_KEY` is non-empty — the key itself is never returned. `extract.gemini` / `extract.groq` are `true` when the matching key is non-empty. `extract.configured` is `true` when either provider key is set. Keys are never returned.
 
 ---
 
@@ -216,7 +225,7 @@ Returns the fixture bytes (`image/jpeg` or `image/png`) so the UI can display an
     "tiles": 42,
     "conf_threshold": 0.25,
     "inference_ms": 3120,
-    "model": "yolov8n.pt",
+    "model": "yolov8n.onnx",
     "geo": {
       "center_lat": 43.5094,
       "center_lng": -79.9518,
@@ -349,7 +358,7 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 | `TILE_SIZE` | `640` | Sliding-window tile edge in pixels |
 | `TILE_OVERLAP` | `0.2` | Fractional tile overlap |
 | `TILE_BATCH_SIZE` | `1` | Tiles per ONNX forward |
-| `TORCH_NUM_THREADS` | `1` | PyTorch/OMP threads. `1` avoids a 137 OOM on a 2 GB instance |
+| `TORCH_NUM_THREADS` | `1` | ORT / OMP thread cap. `1` keeps RSS down on a 2 GB instance |
 | `DETECT_MAX_PIXELS` | `2500000` | Working resolution for detect. Larger images are downscaled, then boxes are mapped back |
 | `MAX_UPLOAD_BYTES` | `26214400` | 25 MB request cap |
 | `MAX_IMAGE_PIXELS` | `40000000` | 40 MP decoded-pixel cap |

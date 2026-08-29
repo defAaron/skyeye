@@ -192,7 +192,7 @@ export default function App() {
                 </p>
                 <p className="card__hint">
                   {apiBaseUrl()
-                    ? 'The Render API did not respond. Status 137 is an out-of-memory kill — the service needs Standard / 2 GB, then a restart. Reload this page after it is up.'
+                    ? 'The Render API did not respond. Status 137 is an out-of-memory kill. The shipped image is ONNX Runtime (no PyTorch) and still wants Standard / 2 GB. Reload this page after the service is up.'
                     : 'Start the Flask backend on port 5001, then reload this page.'}
                 </p>
               </>

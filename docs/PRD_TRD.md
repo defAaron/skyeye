@@ -4,6 +4,8 @@
 
 **Hackathon:** RescueHacks | **Track:** Emergency Response / Community Rescue
 
+**Status (August 2026):** this is the **shipped hackathon product**, not a backlog. Landing at `/`, operator console at `/app`, extract → geocode → LPB ring → tiled YOLOv8n **ONNX** detect, Vercel UI + Render API. Stretch items (video ingest, multi-report clustering, HERIDAL fine-tune, globe-as-product) are **not** in the build. Frozen HTTP shapes: [api-contract.md](api-contract.md). Post-hackathon path: [skyeye-next-steps.pdf](skyeye-next-steps.pdf).
+
 ---
 
 ## PART 1 — PRODUCT REQUIREMENTS DOCUMENT (PRD)
@@ -31,11 +33,11 @@ SkyEye compresses that pipeline: a caller describes what they know in plain lang
     conservation area entrance."
         │
         ▼
-2. LLM EXTRACTION (Gemini, free tier)
+2. LLM EXTRACTION (Gemini Flash, Groq GPT-OSS fallback)
    Structured JSON out:
-   { location_text, approx_time_last_seen, elapsed_hours,
-     description: {age, clothing, distinguishing_features},
-     terrain_hint, urgency_flags }
+   { location_text, time_last_seen, elapsed_hours,
+     subject: {age, clothing, distinguishing_features, category},
+     terrain_hint }
         │
         ▼
 3. GEOCODE + SEARCH RADIUS
@@ -44,39 +46,35 @@ SkyEye compresses that pipeline: a caller describes what they know in plain lang
    see 1.5) → bounding box drawn on map
         │
         ▼
-4. IMAGERY RETRIEVAL
-   Pull the best available overhead imagery for that bounding box
-   (see TRD 2.3 for the resolution caveat — this is the one part
-   of the pipeline that needs an honest workaround)
+4. IMAGERY
+   Operator picks a demo fixture or uploads a JPEG/PNG drone photograph.
+   Map / satellite tiles are never detector input (see TRD 2.3).
         │
         ▼
 5. DETECTION
-   YOLOv8 model (fine-tuned on aerial person-detection datasets)
-   scans imagery → bounding boxes + confidence scores for
-   candidate human shapes
+   YOLOv8n (ONNX Runtime, sliding-window tiles) scans the photograph →
+   bounding boxes + confidence scores for candidate human shapes
         │
         ▼
 6. FUSION + OUTPUT
-   Detections re-projected onto the map as pins, sorted by
-   confidence + proximity to last known location.
-   UI returns:
-   "3 candidate sightings found near [area]. Highest-confidence
-    match: 340m NE of last known location (confidence 0.78).
-    Contact SAR / 911 to verify before approaching."
+   Detections as boxes on the photograph and pins on the ring when the
+   fixture is georeferenced, sorted by confidence. Distance from last-known
+   when both points exist. The UI never says "found." Zero candidates is
+   not "the area is clear." Contact 911 / local SAR immediately.
 ```
 
-### 1.4 Core Features (MVP for hackathon demo)
+### 1.4 Core Features (hackathon demo — shipped)
 
-| # | Feature | Priority |
-|---|---------|----------|
-| 1 | Free-text intake box → LLM structured extraction | Must-have |
-| 2 | Geocoded map view centered on last known location | Must-have |
-| 3 | Search radius overlay based on elapsed time | Must-have |
-| 4 | Object detector run against demo aerial imagery, bounding boxes shown | Must-have |
-| 5 | Ranked candidate list with confidence + distance | Must-have |
-| 6 | "Contact emergency services" persistent banner (safety requirement) | Must-have |
-| 7 | Live drone feed ingestion (upload video, run detection per frame) | Stretch |
-| 8 | Multi-report clustering (multiple witnesses → merged search area) | Stretch |
+| # | Feature | Status |
+|---|---------|--------|
+| 1 | Free-text intake box → LLM structured extraction | Shipped (`/api/extract`) |
+| 2 | Geocoded map view centered on last known location | Shipped (Maps JS) |
+| 3 | Search radius overlay based on elapsed time | Shipped (simplified LPB) |
+| 4 | Object detector on demo aerial imagery + upload, bounding boxes shown | Shipped (tiled YOLOv8n ONNX) |
+| 5 | Ranked candidate list with confidence + distance when georeferenced | Shipped |
+| 6 | "Contact emergency services" persistent banner (safety requirement) | Shipped (console + landing footer) |
+| 7 | Live drone feed ingestion (upload video, run detection per frame) | Out of scope this build |
+| 8 | Multi-report clustering (multiple witnesses → merged search area) | Out of scope this build |
 
 ### 1.5 A Real Technique Worth Citing in Your Demo
 
@@ -84,16 +82,17 @@ Real SAR teams use **Lost Person Behavior (Koester methodology)** — statistica
 
 ### 1.6 Safety & Responsible Design (hackathon requirement)
 
-- Every result screen carries a non-dismissible banner: *"SkyEye surfaces possible leads only. It does not confirm a person's location or safety. Contact 911 / local SAR immediately."*
+- Non-dismissible banner on the console (same copy in the landing footer): *"SkyEye surfaces possible leads only. It does not confirm a person's location or safety. Contact 911 / local SAR immediately."*
 - No feature suggests the user should personally go investigate a detection.
 - Confidence scores are shown explicitly (never a bare "found!" claim) to avoid false certainty.
 - All demo imagery/datasets are pre-existing public research data — no live surveillance claims.
 
-### 1.7 Success Metrics (for judges' "Future Potential")
+### 1.7 Success Metrics (demo, as shipped)
 
-- Detection recall on a held-out slice of the aerial SAR dataset (be ready to state a real number from your validation set).
-- Time-to-first-lead: report submitted → first ranked candidate shown (target: under 30 seconds in demo).
-- Post-hackathon path: partnership pilot with a volunteer SAR org that already flies drones but reviews footage manually — this is your "beyond the hackathon" answer.
+- Time-to-first-lead: under 30 s target. Slowest demo fixture is about 5–8 s on a laptop CPU.
+- 7 of 8 demo fixtures behave as expected; both true-negative canopy fixtures return zero false positives.
+- Measured detector floor: pretrained YOLOv8n misses subjects ≤60 px; `lone_surfer_shorebreak` is a permanent pose miss. Quote those, do not paper over them.
+- Post-hackathon path: partnership pilot with a volunteer SAR org that already flies drones but reviews footage manually — see [skyeye-next-steps.pdf](skyeye-next-steps.pdf).
 
 ---
 
@@ -114,8 +113,8 @@ Real SAR teams use **Lost Person Behavior (Koester methodology)** — statistica
        │                     │               └─────────────────────┘
        │                     ▼
        │            ┌──────────────────┐     ┌─────────────────────┐
-       │            │  /api/detect     │────▶│  YOLOv8 (PyTorch,    │
-       │            │                  │     │  local inference)    │
+       │            │  /api/detect     │────▶│  YOLOv8n ONNX Runtime │
+       │            │                  │     │  (no PyTorch in proc)  │
        │            └──────────────────┘     └─────────────────────┘
        │                     │
        ▼                     ▼
@@ -124,35 +123,37 @@ Real SAR teams use **Lost Person Behavior (Koester methodology)** — statistica
 └──────────────────────────────────────────────┘
 ```
 
-### 2.2 Exact Tooling (free-tier only, as requested)
+### 2.2 Tooling (as shipped)
 
 | Layer | Tool | Why / Free-tier notes |
 |-------|------|----------------------|
-| LLM extraction | **Gemini 2.0 Flash** via Google AI Studio API | Free tier (as of this writing) gives generous per-minute/per-day request limits — plenty for a hackathon demo. Use `responseSchema` / JSON mode so extraction is a typed object, not free text you have to re-parse. |
-| LLM fallback | **Groq API — Llama 3.1 8B Instant** | Fully free, extremely low latency. Keep as a fallback call if Gemini's free quota gets hit mid-demo (judges will not wait for a retry). |
-| Geocoding | **Google Maps Geocoding API** | Google Cloud's free monthly credit covers hackathon-scale usage; converts your extracted `location_text` into lat/lng. |
-| Map rendering | **Google Maps JavaScript API** (`@react-google-maps/api`) | Matches your React stack; free tier is sufficient for a demo. |
-| Object detection model | **YOLOv8n or YOLOv8s (Ultralytics, open-source)** | Free, runs locally on CPU for small demo images, fine-tunable in a Colab notebook for free on their GPU tier. |
-| Aerial person-detection training data | **HERIDAL dataset** or **SARD (Search And Rescue Dataset)** or **C2A (disaster victim aerial dataset)** | Free, public, purpose-built for exactly this task — drone-altitude imagery with labeled human bounding boxes. |
-| Backend | **Flask** (matches your existing stack) | Simple `/extract`, `/geocode`, `/detect` endpoints. |
-| Frontend | **React** (matches your existing stack) | Reuse patterns from your personal site / hackathon web editor project. |
+| LLM extraction | **Gemini Flash** via Google AI Studio (`gemini-3.6-flash`, then 3.5-lite / 3.5 / 3.1-lite, then `gemini-flash-latest`) | Typed JSON. Gemini 2.0 Flash is retired. |
+| LLM fallback | **Groq — `openai/gpt-oss-20b`**, then `openai/gpt-oss-120b` | Llama 3.1 Instant is shut down on Groq free/developer tiers (Aug 2026). |
+| Geocoding | **Google Maps Geocoding API** | Server-side. Key never in the browser or in JSON. |
+| Map rendering | **Google Maps JavaScript API** (`@vis.gl/react-google-maps`) | Browser key, HTTP-referrer restricted. |
+| Object detection | **YOLOv8n ONNX Runtime** | Tiled inference. Production image has no PyTorch. |
+| Aerial person-detection training data | **Not used in this build.** Demo corpus is 8 Wikimedia Commons drone photos. HERIDAL / SARD / C2A remain request-gated. | Fine-tune is post-hackathon. |
+| Backend | **Flask** | `/api/extract`, `/api/geocode`, `/api/detect`, `/api/samples`, `/api/health`. |
+| Frontend | **Vite + React + TypeScript** | `/` landing, `/app` console. |
+| Deploy | **Vercel** (UI) + **Render Docker** (API) | Browser calls Render directly. |
 
-### 2.3 Critical Technical Constraint — Read This Before You Build
+### 2.3 Critical technical constraint
 
-Be precise about this in your pitch, because a judge with any GIS background will ask about it, and getting ahead of it is a **credibility win**, not a weakness to hide:
+Be precise about this in the demo: a judge with any GIS background will ask, and getting ahead of it is a **credibility win**.
 
-**Google Maps satellite/static imagery cannot resolve a person.** Commercial satellite imagery tops out around 30–50cm/pixel resolution even in the best cases, and Google's static tiles are generally coarser. A person is roughly the size of 1–2 pixels at that resolution — a YOLO model has nothing to detect. This is a real, well-known limit in the remote-sensing field, not a bug in your implementation.
+**Google Maps satellite/static imagery cannot resolve a person.** Commercial satellite imagery tops out around 30–50cm/pixel. A person is roughly 1–2 pixels — a detector has nothing to find. This is a remote-sensing limit, not a bug.
 
-**The fix (and it's a good one):** decouple "where to look" from "what to look at."
+**What shipped:** decouple "where to look" from "what to look at."
 
-- Use **Google Maps** for what it's actually good at: geocoding, drawing the search radius, and giving the user a clean, familiar map UI to navigate.
-- Use **drone-altitude imagery** (from HERIDAL/SARD/C2A, or an uploaded video for the stretch feature) for the actual detection step — this is the altitude those datasets and real SAR drones operate at, and where YOLO-style detection genuinely works.
-- Frame this explicitly in your demo: *"SkyEye pinpoints the search area from a report, then runs detection on the closest available aerial/drone imagery for that area — not on satellite tiles, which don't have the resolution to resolve a person."* This is more accurate than most hackathon SAR pitches and will read as rigor, not limitation.
-- For the live demo itself, simulate the "drone flyover" using pre-recorded footage tagged to a plausible location — a completely standard hackathon demo technique, and safe to disclose plainly to judges.
+- **Google Maps** geocodes, draws the LPB ring, and shows pins. Never scanned.
+- **Detection** runs on drone-altitude JPEG/PNG (demo fixtures or upload). HERIDAL/SARD were not used (gated). Video ingest was not shipped.
+- Demo flyovers on the Bruce Trail / Milton conservation area are **labeled demo-placement** — those photographs were not captured there.
 
-### 2.4 Data Flow — Request/Response Shapes
+### 2.4 Data flow — request/response shapes
 
-**`POST /api/extract`**
+Canonical shapes: [api-contract.md](api-contract.md). Summary:
+
+**`POST /api/extract`** — `provider` is `"gemini"` or `"groq"`; `disclaimer` is always present. Extract does not geocode.
 
 ```json
 // Request
@@ -173,23 +174,28 @@ Be precise about this in your pitch, because a judge with any GIS background wil
 }
 ```
 
-**`POST /api/geocode`** → `{ "lat": 43.49, "lng": -79.93, "radius_m": 1400 }`
+**`POST /api/geocode`** → `{ lat, lng, formatted_address, radius_m, category, elapsed_hours, lpb_note }`
 
 (radius derived from `elapsed_hours` + `category` via a simplified Lost Person Behavior lookup table)
 
-**`POST /api/detect`** → array of `{ "bbox": [...], "confidence": 0.78, "lat": ..., "lng": ... }`, sorted descending by confidence.
+**`POST /api/detect`** → `{ detections: [{ id, bbox_xyxy, confidence, class_name, lat, lng }], meta, disclaimer }`, sorted by confidence descending. `lat`/`lng` are null for uploads.
 
-### 2.5 Suggested Build Order (for a hackathon timeline)
+### 2.5 Build order (completed)
 
-1. Hardcode a sample report → verify Gemini extraction JSON is reliable and typed correctly.
-2. Wire geocoding + map rendering with a static pin (no detection yet) — get the UI demo-able early.
-3. Get YOLOv8 running locally against a few HERIDAL/SARD sample images — validate detection works before touching the pipeline.
-4. Connect detection output back onto the map as pins.
-5. Polish: confidence sorting, the safety banner, and a clean "type a report → see results" demo path.
-6. If time remains: stretch feature (video upload → per-frame detection).
+1. Typed Gemini/Groq extract JSON.
+2. Geocoding + Maps JS ring (no detection).
+3. YOLOv8n ONNX against the Wikimedia demo corpus — not HERIDAL (gated).
+4. Detection pins on the map for georeferenced fixtures (demo-placement labeled).
+5. Safety banner, ranked list, landing + `/app`.
+6. Vercel + Render. Video upload was not shipped.
 
-### 2.6 Post-Hackathon Path (for "Future Potential" scoring)
+### 2.6 Post-hackathon path
 
-- Real drone integration (DJI SDK or similar) instead of static datasets.
-- Fine-tune detection on infrared/thermal drone footage for night search capability — the single highest-impact real-world upgrade, since most SAR misses happen after dark.
+Unchanged in intent; not in this repo's current scope:
+
+- Fine-tune on HERIDAL/SARD.
+- Video / live drone ingest (DJI SDK or similar).
+- Infrared/thermal for night search.
 - Partnership pilot with a volunteer SAR chapter that already owns drones.
+
+Details: [skyeye-next-steps.pdf](skyeye-next-steps.pdf).

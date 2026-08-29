@@ -1,19 +1,25 @@
 # SkyEye frontend
 
-Vite + React + TypeScript testing UI for the SkyEye detection API. Plain CSS, no UI
-framework, no map SDK.
+Vite + React + TypeScript. Plain CSS. Two routes from `src/Root.tsx`:
+
+| Path | What |
+|------|------|
+| `/` | Landing (`src/landing/`). Decorative Three.js globe — not a search surface. |
+| `/app` | Operator console (`src/App.tsx`). Report intake, LPB ring, map, detect. |
+
+`frontend/vercel.json` rewrites `/app` to `index.html` so the console works on Vercel.
 
 ## Run
 
 ```bash
+cp .env.example .env.local
+# VITE_GOOGLE_MAPS_API_KEY — Maps JS, restrict to http://localhost:5173/*
+# Leave VITE_API_BASE_URL unset so Vite proxies /api → Flask :5001
 npm install
 npm run dev     # http://localhost:5173
 ```
 
-The dev server proxies `/api/*` to the Flask backend at `http://127.0.0.1:5001`, so
-leave `VITE_API_BASE_URL` unset locally. On Vercel, set it to the Render origin
-(see [docs/deploy.md](../docs/deploy.md)). Start the backend separately or the
-status panel will report the backend as unreachable.
+Start the backend separately or the console status panel reports it unreachable. Production: set `VITE_API_BASE_URL` to the Render origin (no trailing slash) and rebuild — see [docs/deploy.md](../docs/deploy.md).
 
 ## Scripts
 
@@ -28,16 +34,25 @@ status panel will report the backend as unreachable.
 
 ```
 src/
-├── api/client.ts            # typed fetch wrappers, contract error parsing
-├── components/SafetyBanner  # non-dismissible disclaimer bar
+├── Root.tsx                 # `/` vs `/app`
+├── App.tsx                  # Console shell
+├── main.tsx
 ├── types.ts                 # mirrors docs/api-contract.md
-└── App.tsx                  # Detect page shell
+├── api/client.ts            # typed fetch, 180s detect abort, VITE_API_BASE_URL
+├── landing/                 # LandingPage, GlobeScene
+├── lib/                     # geo, format, errorCopy
+└── components/
+    ├── SafetyBanner         # non-dismissible contract disclaimer
+    ├── ReportIntake         # POST /api/extract
+    ├── SearchArea           # POST /api/geocode + LPB fields
+    ├── SearchMap            # @vis.gl/react-google-maps
+    ├── DetectPanel          # samples, upload, detect
+    ├── SamplePicker
+    ├── UploadZone           # JPEG/PNG only
+    ├── DetectionOverlay
+    └── DetectionList
 ```
 
-`src/types.ts` mirrors [`docs/api-contract.md`](../docs/api-contract.md) and may only
-change alongside it.
+`src/types.ts` mirrors [`docs/api-contract.md`](../docs/api-contract.md) and may only change alongside it.
 
-## Not yet implemented
-
-Sample picker, upload, detection overlay, and the ranked results list land in a later
-step. No secrets or API keys belong in this app.
+Gemini / Groq / Geocoding keys stay on the backend. The only frontend secret-shaped value is the **Maps JavaScript** key, which Google expects in the browser. Restrict it to HTTP referrers.

@@ -1,8 +1,9 @@
 # Deploy SkyEye (Vercel UI + Render API)
 
-The browser talks to Render **directly**. Do not proxy `/api` through Vercel: Hobby
-rewrites time out around 10 seconds, and tiled CPU detect routinely needs tens of
-seconds (the client already waits up to 180s).
+This is the **shipped** topology. The browser talks to Render **directly**. Do not
+proxy `/api` through Vercel: Hobby rewrites time out around 10 seconds, and
+tiled CPU detect routinely needs tens of seconds (the client already waits up
+to 180s).
 
 ## What you need
 
@@ -102,8 +103,9 @@ Then open the Vercel URL:
    while the model warms. Later runs should land in tens of seconds.
 5. True-negative fixture still returns zero candidates.
 
-## What we deliberately did not do
+## What this build does not include
 
 - No Vercel rewrite of `/api` → Render (timeout).
 - No change to `/api/detect` request/response shape.
+- No video upload, globe-as-product, or satellite-tile detect.
 - No commit of `.env`, keys, weights, or fixture image blobs.

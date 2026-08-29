@@ -16,7 +16,7 @@ import type { Detection, GeocodeResponse } from '../types'
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined
 
 const MAPS_JS_HINT =
-  'On the project that owns this browser key: enable Maps JavaScript API, link billing, and set HTTP referrers to https://skyeye-one.vercel.app/* and http://localhost:5173/* (the /* is required). Then open DevTools → Console and look for “Google Maps JavaScript API error: …MapError”.'
+  'On the Google Cloud project that owns this browser key: enable Maps JavaScript API, link billing, and set HTTP referrers to http://localhost:5173/* and https://YOUR-VERCEL-DOMAIN/* (the trailing /* is required). Then open DevTools → Console and look for “Google Maps JavaScript API error: …MapError”.'
 
 interface SearchMapProps {
   searchArea: GeocodeResponse | null

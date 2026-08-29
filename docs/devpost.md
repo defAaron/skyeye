@@ -50,7 +50,7 @@ A non-dismissible banner stays on every result: SkyEye surfaces possible leads o
 |---|---|
 | API | Flask: `/api/extract`, `/api/geocode`, `/api/detect`, `/api/samples`, `/api/health` |
 | Detection | YOLOv8n ONNX Runtime, tiled inference + IoU/containment merge |
-| Intake | Gemini Flash primary, Groq GPT-OSS 20B fallback, typed JSON |
+| Intake | Gemini Flash primary, Groq GPT-OSS 20B then 120B fallback, typed JSON |
 | Where | Google Geocoding (server) + Maps JS (`@vis.gl/react-google-maps`) |
 | Radius | Simplified LPB 50th-percentile table |
 | UI | Vite + React + TypeScript; landing + operator console at `/app` |
@@ -77,7 +77,7 @@ Demo wilderness fixtures sit on the Bruce Trail / Milton conservation area so pi
 
 **Pose failures.** One fixture, `lone_surfer_shorebreak`, never detects at any threshold. A person lying prone on a board, seen from directly above, misses COCO’s upright-person prior. Tiling cannot fix it. I kept the miss in the corpus on purpose.
 
-**Production memory.** PyTorch on a 2 GB Render box died with status $137$. The fix was architectural: never import `torch` at runtime, bake an ONNX export into the Docker image, run ONNX Runtime, one Gunicorn worker, `TORCH_NUM_THREADS=1`. The operator needed a Docker rebuild.
+**Production memory.** PyTorch on a 2 GB Render box died with status $137$. The fix was architectural: never import `torch` at runtime, bake an ONNX export into the Docker image, run ONNX Runtime, one Gunicorn worker, `TORCH_NUM_THREADS=1`. A restart was not enough — the image itself had to be rebuilt.
 
 **Honest demo geography.** Pins on a familiar trail invite the question: “was this photo taken there?” Labeling demo-placement in the UI bought credibility.
 
@@ -89,7 +89,7 @@ Demo wilderness fixtures sit on the Bruce Trail / Milton conservation area so pi
 - **Time-to-first-lead.** Slowest fixture is about $5$ to $8\,\text{s}$ on a laptop CPU, inside the $30\,\text{s}$ PRD target.
 - **Measured limits in the README.** A $60\,\text{px}$ floor, a known pose miss, and a tiling tradeoff with real numbers.
 - **Safety in the UI.** Explicit confidence, no “found” copy, persistent emergency banner, keys kept out of responses and logs.
-- **A deploy that runs detection.** ONNX on Render, Maps + extract on the live console, API contract frozen so the shape stays put mid-build.
+- **A deploy that runs detection.** ONNX on Render, Maps + extract on the live console, landing at `/` and operator console at `/app`. API contract frozen.
 
 ---
 

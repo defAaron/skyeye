@@ -52,6 +52,21 @@ const COPY: Record<string, ErrorCopy> = {
     hint: 'Nothing was assessed, so treat this as no information at all — not as an all-clear. Try running it again.',
     retryable: true,
   },
+  INTERNAL_ERROR: {
+    title: 'The server hit an unexpected error',
+    hint: 'Nothing was assessed. Treat this as no information rather than an all-clear, and try again.',
+    retryable: true,
+  },
+  NOT_FOUND: {
+    title: 'That API path does not exist',
+    hint: 'The client called an unknown URL. Reload the page; if it persists, the frontend and API are out of date with each other.',
+    retryable: false,
+  },
+  METHOD_NOT_ALLOWED: {
+    title: 'That HTTP method is not allowed here',
+    hint: 'The client used the wrong verb for this endpoint. Reload the page and try again.',
+    retryable: false,
+  },
   MODEL_UNAVAILABLE: {
     title: 'The detection model is not available yet',
     hint: 'The model weights are still being prepared on the server. No image can be assessed until they are ready.',
@@ -134,7 +149,7 @@ const COPY: Record<string, ErrorCopy> = {
   },
   NETWORK_ERROR: {
     title: 'The SkyEye backend could not be reached',
-    hint: 'Locally, start Flask on port 5001. On the live site, Render may have killed the API (status 137 is out of memory on first detect). Use a Standard / 2 GB instance, wait for a restart, then try again.',
+    hint: 'Locally, start Flask on port 5001. On the live site, check that the Render API is up. Status 137 is an out-of-memory kill — the shipped image is ONNX Runtime without PyTorch and still wants Standard / 2 GB.',
     retryable: true,
   },
   BAD_RESPONSE: {
