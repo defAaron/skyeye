@@ -8,10 +8,10 @@
 
 The first hours after someone goes missing matter most, and they are messy. A caller is scared, the report is unstructured, and the search area starts as a guess. If a drone goes up, someone still has to scan every frame for a person-shaped speck in trees, water, or trail.
 
-I built SkyEye for **RescueHacks** (Emergency Response / Community Rescue). “Run YOLO on a satellite map” fails in thirty seconds with a GIS-literate judge. Commercial satellite imagery tops out around $30$ to $50\,\text{cm}$ per pixel. From nadir, a person is about half a metre across:
+I built SkyEye for **RescueHacks** (Emergency Response / Community Rescue). “Run YOLO on a satellite map” fails in thirty seconds with a GIS-literate judge. Commercial satellite imagery tops out around 30 to 50 cm per pixel. From nadir, a person is about half a metre across:
 
 $$
-n_{\text{pixels}} \approx \frac{w_{\text{person}}}{\text{GSD}} \approx \frac{0.5\,\text{m}}{0.4\,\text{m/px}} \approx 1\text{ to }2
+n_{\mathrm{pixels}} \approx \frac{w_{\mathrm{person}}}{\mathrm{GSD}} \approx \frac{0.5\,\mathrm{m}}{0.4\,\mathrm{m/px}} \approx 1\mathrm{\ to\ }2
 $$
 
 A detector has nothing to find. That constraint became the product: **decouple where to look from what to look at.** Maps and Lost Person Behavior size the ring. Detection runs only on drone-altitude photographs, the altitude real SAR drones fly.
@@ -28,13 +28,13 @@ SkyEye is two loops that meet on a map.
 
 **1. Report → search area**
 
-A bystander or coordinator types what they know in plain language (“Dad, 70, red jacket, Bruce Trail near Milton, last seen around 3pm”). Gemini Flash (Groq as fallback) extracts structured facts: last-known place, elapsed hours, clothing, and a subject category. Google Geocoding turns the place into $\text{lat}/\text{lng}$. A simplified 50th-percentile Lost Person Behavior table sizes the ring:
+A bystander or coordinator types what they know in plain language (“Dad, 70, red jacket, Bruce Trail near Milton, last seen around 3pm”). Gemini Flash (Groq as fallback) extracts structured facts: last-known place, elapsed hours, clothing, and a subject category. Google Geocoding turns the place into lat/lng. A simplified 50th-percentile Lost Person Behavior table sizes the ring:
 
 $$
-r = \operatorname{clamp}\!\left(r_{50}\sqrt{\frac{t}{t_0}},\; 200\,\text{m},\; 8000\,\text{m}\right),\qquad t_0 = 3\,\text{h}
+r = \mathrm{clamp}\left(r_{50}\sqrt{\frac{t}{t_0}},\; 200\,\mathrm{m},\; 8000\,\mathrm{m}\right),\qquad t_0 = 3\,\mathrm{h}
 $$
 
-$\sqrt{t}$ keeps the ring from doubling when time doubles. An elderly hiker at $4.5\,\text{h}$ gets $r = 1347\,\text{m}$ from the table.
+√t keeps the ring from doubling when time doubles. An elderly hiker at 4.5 h gets r = 1347 m from the table.
 
 **2. Drone photo → ranked candidates**
 
@@ -57,13 +57,13 @@ A non-dismissible banner stays on every result: SkyEye surfaces possible leads o
 | Demo corpus | 8 openly licensed Wikimedia Commons drone photos |
 | Deploy | Vercel (UI) + Render Docker (API). Detect goes straight to Render, past Vercel’s Hobby timeout. |
 
-Aerial people are a few dozen pixels tall. One downscaled pass loses them, so the image is cut into overlapping tiles of edge $T$ and overlap $\rho$:
+Aerial people are a few dozen pixels tall. One downscaled pass loses them, so the image is cut into overlapping tiles of edge T and overlap ρ:
 
 $$
 s = T\,(1-\rho)
 $$
 
-Each tile is letterboxed to the network’s native input. Detections project back to full-image space, then merge. `TILE_SIZE` is a recall lever. On a controlled scale test, $T=320$ lifted recall from $4/10$ to $7/10$, at about $2.5\times$ latency and $5\times$ the false positives.
+Each tile is letterboxed to the network’s native input. Detections project back to full-image space, then merge. `TILE_SIZE` is a recall lever. On a controlled scale test, T = 320 lifted recall from 4/10 to 7/10, at about 2.5× latency and 5× the false positives.
 
 Demo wilderness fixtures sit on the Bruce Trail / Milton conservation area so pins can be reviewed on a real map. The UI labels them as demo-placed.
 
@@ -73,11 +73,11 @@ Demo wilderness fixtures sit on the Bruce Trail / Milton conservation area so pi
 
 **Satellite GSD.** The obvious demo is “drop a pin, scan the basemap.” That is physically impossible at commercial GSD. The detector never runs on map tiles.
 
-**COCO priors on aerial subjects.** Pretrained YOLOv8n has a hard floor around $60\,\text{px}$. Subjects $\ge 100\,\text{px}$ tall are reliable. Subjects $\le 60\,\text{px}$ are missed entirely; the model never sees them. Dropping confidence to $0.05$ recovered none of them and added nine false positives. HERIDAL-class drone imagery puts a person at roughly $30$ to $60\,\text{px}$. That is the gap.
+**COCO priors on aerial subjects.** Pretrained YOLOv8n has a hard floor around 60 px. Subjects ≥ 100 px tall are reliable. Subjects ≤ 60 px are missed entirely; the model never sees them. Dropping confidence to 0.05 recovered none of them and added nine false positives. HERIDAL-class drone imagery puts a person at roughly 30 to 60 px. That is the gap.
 
 **Pose failures.** One fixture, `lone_surfer_shorebreak`, never detects at any threshold. A person lying prone on a board, seen from directly above, misses COCO’s upright-person prior. Tiling cannot fix it. I kept the miss in the corpus on purpose.
 
-**Production memory.** PyTorch on a 2 GB Render box died with status $137$. The fix was architectural: never import `torch` at runtime, bake an ONNX export into the Docker image, run ONNX Runtime, one Gunicorn worker, `TORCH_NUM_THREADS=1`. A restart was not enough — the image itself had to be rebuilt.
+**Production memory.** PyTorch on a 2 GB Render box died with status 137. The fix was architectural: never import `torch` at runtime, bake an ONNX export into the Docker image, run ONNX Runtime, one Gunicorn worker, `TORCH_NUM_THREADS=1`. A restart was not enough — the image itself had to be rebuilt.
 
 **Honest demo geography.** Pins on a familiar trail invite the question: “was this photo taken there?” Labeling demo-placement in the UI bought credibility.
 
@@ -86,8 +86,8 @@ Demo wilderness fixtures sit on the Bruce Trail / Milton conservation area so pi
 ## Accomplishments that I'm proud of
 
 - **7 of 8 demo fixtures behave as expected.** Both true-negative fixtures (conifer canopy, closed broadleaf) return zero false positives.
-- **Time-to-first-lead.** Slowest fixture is about $5$ to $8\,\text{s}$ on a laptop CPU, inside the $30\,\text{s}$ PRD target.
-- **Measured limits in the README.** A $60\,\text{px}$ floor, a known pose miss, and a tiling tradeoff with real numbers.
+- **Time-to-first-lead.** Slowest fixture is about 5 to 8 s on a laptop CPU, inside the 30 s PRD target.
+- **Measured limits in the README.** A 60 px floor, a known pose miss, and a tiling tradeoff with real numbers.
 - **Safety in the UI.** Explicit confidence, no “found” copy, persistent emergency banner, keys kept out of responses and logs.
 - **A deploy that runs detection.** ONNX on Render, Maps + extract on the live console, landing at `/` and operator console at `/app`. API contract frozen.
 
