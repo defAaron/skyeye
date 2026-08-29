@@ -46,6 +46,10 @@ export default function App() {
     }
   }, [])
 
+  useEffect(() => {
+    document.title = 'SkyEye — Detection console'
+  }, [])
+
   const onResults = useCallback((result: DetectResponse | null) => {
     setDetectResult(result)
     setHoveredId(null)
@@ -69,6 +73,11 @@ export default function App() {
 
       <div className="page">
         <header className="page__header">
+          <p className="page__eyebrow">
+            <a className="page__back" href="/">
+              ← SkyEye
+            </a>
+          </p>
           <h1 className="page__title">SkyEye</h1>
           <p className="page__subtitle">
             Drone-altitude person detection — leads to verify, never confirmations.

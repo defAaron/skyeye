@@ -9,6 +9,22 @@
   border-bottom: 1px solid var(--border);
 }
 
+.page__eyebrow {
+  margin-bottom: 0.5rem;
+}
+
+.page__back {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.page__back:hover {
+  color: var(--accent);
+}
+
 .page__title {
   font-size: 1.875rem;
   font-weight: 650;

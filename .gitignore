@@ -1,8 +1,10 @@
 # Local agent planning — plans and status stay on this machine.
 # .cursor/rules/ is committed so every agent is told to read those plans.
+# .cursor/mcp.json is committed so Playwright MCP is available to agents.
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
+!.cursor/mcp.json
 
 # Secrets / env
 .env
