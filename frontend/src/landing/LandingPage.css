@@ -308,7 +308,12 @@
   background: var(--lp-card);
 }
 
-.lp-globe-mount,
+.lp-globe-mount {
+  position: relative;
+  width: min(31.5rem, 92vw);
+  aspect-ratio: 1;
+}
+
 .lp-globe-canvas {
   position: absolute;
   inset: 0;
@@ -570,6 +575,10 @@
 
   .lp-hero-globe {
     min-height: 100%;
+  }
+
+  .lp-globe-mount {
+    width: min(42rem, 50vw);
   }
 
   .lp-section {

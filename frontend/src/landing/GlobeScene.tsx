@@ -23,7 +23,7 @@ export default function GlobeScene() {
 
       const scene = new THREE.Scene()
       const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-      camera.position.set(0, 0.4, 3.2)
+      camera.position.set(0, 0.4, 3.3)
       camera.lookAt(0, 0, 0)
 
       scene.add(new THREE.AmbientLight(0xf5f0ea, 0.6))
@@ -128,55 +128,54 @@ export default function GlobeScene() {
         ),
       )
 
-      const droneGroup = new THREE.Group()
-      const droneMat = new THREE.MeshPhongMaterial({ color: 0x0c2461, shininess: 80 })
-      const armMat = new THREE.MeshPhongMaterial({ color: 0x2d4a8a })
+      const makeDrone = () => {
+        const group = new THREE.Group()
+        const droneMat = new THREE.MeshPhongMaterial({ color: 0x0c2461, shininess: 80 })
+        const armMat = new THREE.MeshPhongMaterial({ color: 0x2d4a8a })
 
-      droneGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.018, 0.06), droneMat))
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.018, 0.06), droneMat))
 
-      const addArm = (x: number, z: number) => {
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.006, 0.006), armMat)
-        arm.position.set(x, 0, z)
-        arm.rotation.y = Math.atan2(z, x)
-        droneGroup.add(arm)
-        const rotor = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.025, 0.025, 0.003, 16),
-          new THREE.MeshPhongMaterial({ color: 0x1e3a8a, transparent: true, opacity: 0.5 }),
+        const addArm = (x: number, z: number) => {
+          const arm = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.006, 0.006), armMat)
+          arm.position.set(x, 0, z)
+          arm.rotation.y = Math.atan2(z, x)
+          group.add(arm)
+          const rotor = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.025, 0.025, 0.003, 16),
+            new THREE.MeshPhongMaterial({ color: 0x1e3a8a, transparent: true, opacity: 0.5 }),
+          )
+          rotor.position.set(x * 1.6, 0.008, z * 1.6)
+          group.add(rotor)
+        }
+        addArm(0.045, 0.045)
+        addArm(-0.045, 0.045)
+        addArm(0.045, -0.045)
+        addArm(-0.045, -0.045)
+
+        const camPod = new THREE.Mesh(
+          new THREE.SphereGeometry(0.01, 8, 8),
+          new THREE.MeshPhongMaterial({ color: 0x0c2461, shininess: 120 }),
         )
-        rotor.position.set(x * 1.6, 0.008, z * 1.6)
-        droneGroup.add(rotor)
+        camPod.position.set(0, -0.018, 0)
+        group.add(camPod)
+
+        const beamMat = new THREE.MeshBasicMaterial({
+          color: 0x1e3a8a,
+          transparent: true,
+          opacity: 0.18,
+          side: THREE.DoubleSide,
+        })
+        const beam = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 16, 1, true), beamMat)
+        beam.position.set(0, -0.08, 0)
+        group.add(beam)
+        scene.add(group)
+        return { group, beamMat }
       }
-      addArm(0.045, 0.045)
-      addArm(-0.045, 0.045)
-      addArm(0.045, -0.045)
-      addArm(-0.045, -0.045)
 
-      const camPod = new THREE.Mesh(
-        new THREE.SphereGeometry(0.01, 8, 8),
-        new THREE.MeshPhongMaterial({ color: 0x0c2461, shininess: 120 }),
-      )
-      camPod.position.set(0, -0.018, 0)
-      droneGroup.add(camPod)
+      const drones = [makeDrone(), makeDrone()]
 
-      const beamMat = new THREE.MeshBasicMaterial({
-        color: 0x1e3a8a,
-        transparent: true,
-        opacity: 0.18,
-        side: THREE.DoubleSide,
-      })
-      const beam = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.12, 16, 1, true), beamMat)
-      beam.position.set(0, -0.08, 0)
-      droneGroup.add(beam)
-      scene.add(droneGroup)
-
-      let t = 0
-      const animate = () => {
-        rafId = requestAnimationFrame(animate)
-        t += 0.004
-        globe.rotation.y += 0.0015
-
-        const angle = t
-        droneGroup.position.set(
+      const placeDrone = (drone: { group: THREE.Group; beamMat: THREE.MeshBasicMaterial }, angle: number) => {
+        drone.group.position.set(
           Math.cos(angle) * orbitRadius,
           Math.sin(angle) * 0.3 * orbitRadius,
           Math.sin(angle) * orbitRadius,
@@ -186,9 +185,18 @@ export default function GlobeScene() {
           Math.cos(angle) * 0.3 * orbitRadius,
           Math.cos(angle) * orbitRadius,
         ).normalize()
-        droneGroup.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), tangent)
+        drone.group.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), tangent)
+        drone.beamMat.opacity = 0.1 + Math.abs(Math.sin(angle * 3)) * 0.15
+      }
 
-        beamMat.opacity = 0.1 + Math.abs(Math.sin(t * 3)) * 0.15
+      let t = 0
+      const animate = () => {
+        rafId = requestAnimationFrame(animate)
+        t += 0.004
+        globe.rotation.y += 0.0015
+
+        placeDrone(drones[0], t)
+        placeDrone(drones[1], t + Math.PI)
         renderer!.render(scene, camera)
       }
       animate()
