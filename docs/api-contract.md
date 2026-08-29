@@ -16,6 +16,8 @@ skyeye/
 │   ├── app.py                  # Flask app factory + entrypoint
 │   ├── config.py               # env-backed settings (limits, weights, CORS)
 │   ├── ratelimit.py            # in-process sliding-window + Gemini/Groq/Maps budgets
+│   ├── gunicorn.conf.py        # 1 gthread worker, 180s timeout (Render)
+│   ├── Dockerfile              # CPU torch + fixtures + weights
 │   ├── requirements.txt
 │   ├── api/
 │   │   ├── __init__.py
@@ -42,7 +44,8 @@ skyeye/
 │       └── images/             # local demo images (gitignored blobs)
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.ts          # /api proxy → Flask
+│   ├── vite.config.ts          # /api proxy → Flask (dev)
+│   ├── vercel.json             # /app → index.html
 │   └── src/
 │       ├── main.tsx
 │       ├── App.tsx
@@ -60,7 +63,7 @@ Ownership (one agent per area per step): `backend/detection/` = ML, `backend/app
 
 ## Conventions
 
-- Base URL in dev: `http://127.0.0.1:5001`. The frontend calls relative `/api/*` and Vite proxies to it.
+- Base URL in dev: `http://127.0.0.1:5001`. The frontend calls `/api/*` (relative in Vite, prefixed by `VITE_API_BASE_URL` on Vercel) and Vite proxies to Flask locally. Production API is the Render origin; do not proxy detect through Vercel.
 - All responses are JSON, `Content-Type: application/json`, except sample image bytes.
 - Coordinates on the image are **pixel space**, origin top-left, `[x_min, y_min, x_max, y_max]` as integers.
 - `lat` / `lng` exist on every detection. They are WGS84 numbers when the submitted sample is georeferenced; otherwise both are `null`. They are always `null` for uploads. Both are numbers or both are `null` — never mixed.
@@ -314,7 +317,7 @@ Provider order: Gemini Flash first (`gemini-3.6-flash`, `gemini-3.5-flash-lite`,
 
 ### Rate limits
 
-In-process sliding windows (reset on process restart). They exist so a tight UI loop or a scripted client cannot burn `GEMINI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_MAPS_API_KEY`. Limits are not returned from `/api/health`. `X-Forwarded-For` is ignored.
+In-process sliding windows (reset on process restart). They exist so a tight UI loop or a scripted client cannot burn `GEMINI_API_KEY`, `GROQ_API_KEY`, or `GOOGLE_MAPS_API_KEY`. Limits are not returned from `/api/health`. `X-Forwarded-For` is ignored unless `TRUST_PROXY=1`, in which case ProxyFix takes the single hop the reverse proxy added.
 
 | Guard | Default | What it protects |
 |-------|---------|------------------|
@@ -336,7 +339,9 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 | Var | Default | Purpose |
 |-----|---------|---------|
 | `FLASK_PORT` | `5001` | Dev server port (5000 collides with macOS AirPlay) |
-| `CORS_ORIGIN` | `http://localhost:5173` | Single allowed origin for the Vite dev server |
+| `CORS_ORIGIN` | `http://localhost:5173` | Allowed browser origins, comma-separated |
+| `CORS_ORIGIN_REGEX` | _(empty)_ | Optional extra origin regex (e.g. Vercel previews) |
+| `TRUST_PROXY` | unset / false | `1` on Render so ProxyFix rewrites `remote_addr` from the proxy hop |
 | `YOLO_WEIGHTS` | `yolov8n.pt` | Weights path; swapped by Step 1.5 if fine-tuning happens |
 | `YOLO_DEVICE` | `cpu` | `cpu`, `mps`, or `cuda` |
 | `CONF_THRESHOLD` | `0.25` | Default confidence floor |
@@ -367,6 +372,7 @@ A Gemini 429 from Google trips a 60 s cooldown so the next extract skips Gemini 
 
 | Var | Purpose |
 |-----|---------|
-| `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API. Exposed to the browser by design. Restrict to HTTP referrers (`http://localhost:5173/*`). Never commit the real value. |
+| `VITE_GOOGLE_MAPS_API_KEY` | Maps JavaScript API. Exposed to the browser by design. Restrict to HTTP referrers (`http://localhost:5173/*` and the Vercel origin). Never commit the real value. |
+| `VITE_API_BASE_URL` | Render origin in production (`https://….onrender.com`), no trailing slash. Leave unset in Vite dev so `/api` uses the local proxy. |
 
 API keys must never be committed. Gemini / Groq keys stay on the backend.

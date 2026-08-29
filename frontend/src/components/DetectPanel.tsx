@@ -4,6 +4,7 @@ import {
   DETECT_TIMEOUT_MS,
   getSamples,
   postDetect,
+  resolveApiUrl,
   SkyEyeApiError,
 } from '../api/client'
 import { describeError } from '../lib/errorCopy'
@@ -165,7 +166,7 @@ export default function DetectPanel({
       void submit(
         { sampleId: selectedSample.id, conf },
         {
-          src: selectedSample.image_url,
+          src: resolveApiUrl(selectedSample.image_url),
           alt: `Sample imagery: ${selectedSample.label}`,
           sample: selectedSample,
           fileName: null,
@@ -186,7 +187,9 @@ export default function DetectPanel({
     }
   }
 
-  const previewSrc = selectedSample?.image_url ?? upload?.previewUrl ?? null
+  const previewSrc = selectedSample
+    ? resolveApiUrl(selectedSample.image_url)
+    : upload?.previewUrl ?? null
   const previewAlt = selectedSample
     ? `Sample imagery: ${selectedSample.label}`
     : upload

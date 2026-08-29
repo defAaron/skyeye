@@ -134,6 +134,8 @@ backend/
   app.py                      Flask app factory
   config.py                   env-backed settings
   ratelimit.py                in-process sliding-window + Gemini/Groq/Maps budgets
+  gunicorn.conf.py            production server (Render)
+  Dockerfile                  CPU torch image, fixtures + weights baked in
   api/                        health, samples, detect, geocode, extract, error shape
   extract/                    Gemini primary, Groq fallback, field normalize
   geo/                        LPB radius, Google geocoder, pixel→lat/lng
@@ -150,6 +152,12 @@ docs/
 ```
 
 The API contract in [docs/api-contract.md](./docs/api-contract.md) is frozen: change it there before changing code on either side.
+
+## Deploy
+
+Production is **Vercel** (Vite UI) + **Render** (Flask + YOLOv8n). The browser calls Render directly — do not proxy `/api` through Vercel, or detect will time out. Render needs **2 GB RAM** (Standard); 512 MB plans OOM when the model loads.
+
+Step-by-step, env vars, and the live smoke list: [docs/deploy.md](./docs/deploy.md). Blueprint: [render.yaml](./render.yaml).
 
 ## Safety and responsible design
 

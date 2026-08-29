@@ -1,0 +1,17 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.env
+.env.*
+!.env.example
+*.pt
+*.pth
+*.onnx
+fixtures/images/*
+!fixtures/images/.gitkeep
+tests/
+*.md
+.DS_Store

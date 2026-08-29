@@ -10,9 +10,10 @@ npm install
 npm run dev     # http://localhost:5173
 ```
 
-The dev server proxies `/api/*` to the Flask backend at `http://127.0.0.1:5001`, so the
-app only ever calls relative paths. Start the backend separately or the status panel
-will report the backend as unreachable.
+The dev server proxies `/api/*` to the Flask backend at `http://127.0.0.1:5001`, so
+leave `VITE_API_BASE_URL` unset locally. On Vercel, set it to the Render origin
+(see [docs/deploy.md](../docs/deploy.md)). Start the backend separately or the
+status panel will report the backend as unreachable.
 
 ## Scripts
 

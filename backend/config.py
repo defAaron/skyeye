@@ -32,12 +32,28 @@ def _float(name: str, default: float) -> float:
         return default
 
 
+def _bool(name: str, default: bool) -> bool:
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
+
+
+def parse_cors_origins(raw: str) -> tuple[str, ...]:
+    """Split CORS_ORIGIN on commas. Empty pieces are dropped."""
+    return tuple(part.strip() for part in raw.split(",") if part.strip())
+
+
 @dataclass(frozen=True)
 class Settings:
     port: int = field(default_factory=lambda: _int("FLASK_PORT", 5001))
     cors_origin: str = field(
         default_factory=lambda: os.environ.get("CORS_ORIGIN", "http://localhost:5173")
     )
+    cors_origin_regex: str = field(
+        default_factory=lambda: (os.environ.get("CORS_ORIGIN_REGEX") or "").strip()
+    )
+    trust_proxy: bool = field(default_factory=lambda: _bool("TRUST_PROXY", False))
     weights: str = field(default_factory=lambda: os.environ.get("YOLO_WEIGHTS", "yolov8n.pt"))
     device: str = field(default_factory=lambda: os.environ.get("YOLO_DEVICE", "cpu"))
     conf_threshold: float = field(default_factory=lambda: _float("CONF_THRESHOLD", 0.25))
@@ -86,6 +102,10 @@ class Settings:
         default_factory=lambda: _int("DETECT_IP_PER_MINUTE", 20)
     )
     detect_ip_per_day: int = field(default_factory=lambda: _int("DETECT_IP_PER_DAY", 80))
+
+    @property
+    def cors_origins(self) -> tuple[str, ...]:
+        return parse_cors_origins(self.cors_origin)
 
     @property
     def geocode_configured(self) -> bool:

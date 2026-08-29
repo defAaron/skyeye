@@ -121,7 +121,12 @@ _CLIENT_MESSAGES = {
 
 
 def client_identity() -> str:
-    """Use the TCP peer. Do not trust X-Forwarded-For — it is trivial to spoof."""
+    """Use the TCP peer (or the proxy-rewritten peer when TRUST_PROXY is on).
+
+    X-Forwarded-For is never read here. Behind Render, ``create_app`` wraps
+    the WSGI app in ProxyFix so ``remote_addr`` is the client hop the proxy
+    added. Direct spoofed headers stay ignored unless that wrap is enabled.
+    """
     return (request.remote_addr or "unknown").strip() or "unknown"
 
 

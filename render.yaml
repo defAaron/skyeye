@@ -1,0 +1,31 @@
+# Render Blueprint — API only. The Vite UI lives on Vercel.
+# https://render.com/docs/blueprint-spec
+#
+# Free (512 MB) and Starter (512 MB) will OOM once PyTorch + YOLOv8n load.
+# Use Standard / 1c-2g (2 GB) at minimum; Pro / 2c-4g if detect is slow.
+
+services:
+  - type: web
+    name: skyeye-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: standard
+    healthCheckPath: /api/health
+    envVars:
+      - key: TRUST_PROXY
+        value: "1"
+      - key: YOLO_DEVICE
+        value: cpu
+      - key: YOLO_WEIGHTS
+        value: /app/yolov8n.pt
+      - key: CORS_ORIGIN
+        sync: false
+      - key: CORS_ORIGIN_REGEX
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

@@ -29,6 +29,35 @@ export class SkyEyeApiError extends Error {
   }
 }
 
+/** Empty in Vite dev (relative `/api` via the proxy). Render origin on Vercel. */
+export function apiBaseUrl(): string {
+  return (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/+$/, '')
+}
+
+/** Join a contract path such as `/api/health` to the configured API origin. */
+export function apiUrl(path: string): string {
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  return `${apiBaseUrl()}${normalized}`
+}
+
+/**
+ * Prefix a contract-relative media path (`sample.image_url`) for the `<img>`
+ * tag. Absolute http(s), blob, and data URLs are left alone.
+ */
+export function resolveApiUrl(path: string): string {
+  if (!path) return path
+  if (/^https?:\/\//i.test(path) || path.startsWith('blob:') || path.startsWith('data:')) {
+    return path
+  }
+  return apiUrl(path)
+}
+
+function networkErrorMessage(): string {
+  return apiBaseUrl()
+    ? 'Could not reach the SkyEye API.'
+    : 'Could not reach the SkyEye backend. Is it running on port 5001?'
+}
+
 function isApiError(body: unknown): body is ApiError {
   if (typeof body !== 'object' || body === null) return false
   const { error } = body as { error?: unknown }
@@ -70,12 +99,9 @@ async function unwrap<T>(response: Response): Promise<T> {
 async function request<T>(path: string): Promise<T> {
   let response: Response
   try {
-    response = await fetch(path, { headers: { Accept: 'application/json' } })
+    response = await fetch(apiUrl(path), { headers: { Accept: 'application/json' } })
   } catch {
-    throw new SkyEyeApiError(
-      'NETWORK_ERROR',
-      'Could not reach the SkyEye backend. Is it running on port 5001?',
-    )
+    throw new SkyEyeApiError('NETWORK_ERROR', networkErrorMessage())
   }
 
   return unwrap<T>(response)
@@ -97,7 +123,7 @@ export async function postExtract(body: ExtractRequest): Promise<ExtractResponse
   try {
     let response: Response
     try {
-      response = await fetch('/api/extract', {
+      response = await fetch(apiUrl('/api/extract'), {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -110,10 +136,7 @@ export async function postExtract(body: ExtractRequest): Promise<ExtractResponse
           'Report extraction took too long and was stopped.',
         )
       }
-      throw new SkyEyeApiError(
-        'NETWORK_ERROR',
-        'Could not reach the SkyEye backend. Is it running on port 5001?',
-      )
+      throw new SkyEyeApiError('NETWORK_ERROR', networkErrorMessage())
     }
     return await unwrap<ExtractResponse>(response)
   } finally {
@@ -129,7 +152,7 @@ export async function postGeocode(body: GeocodeRequest): Promise<GeocodeResponse
   try {
     let response: Response
     try {
-      response = await fetch('/api/geocode', {
+      response = await fetch(apiUrl('/api/geocode'), {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -142,10 +165,7 @@ export async function postGeocode(body: GeocodeRequest): Promise<GeocodeResponse
           'Geocoding took too long and was stopped.',
         )
       }
-      throw new SkyEyeApiError(
-        'NETWORK_ERROR',
-        'Could not reach the SkyEye backend. Is it running on port 5001?',
-      )
+      throw new SkyEyeApiError('NETWORK_ERROR', networkErrorMessage())
     }
     return await unwrap<GeocodeResponse>(response)
   } finally {
@@ -200,7 +220,7 @@ export async function postDetect({
   try {
     let response: Response
     try {
-      response = await fetch('/api/detect', {
+      response = await fetch(apiUrl('/api/detect'), {
         method: 'POST',
         headers: { Accept: 'application/json' },
         body: form,
@@ -216,10 +236,7 @@ export async function postDetect({
       if (signal?.aborted) {
         throw new SkyEyeApiError('CANCELLED', 'The run was cancelled.')
       }
-      throw new SkyEyeApiError(
-        'NETWORK_ERROR',
-        'Could not reach the SkyEye backend. Is it running on port 5001?',
-      )
+      throw new SkyEyeApiError('NETWORK_ERROR', networkErrorMessage())
     }
 
     return await unwrap<DetectResponse>(response)
