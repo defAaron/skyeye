@@ -6,9 +6,9 @@
   margin-top: 0.875rem;
   padding: 1.5rem 1rem;
   text-align: center;
-  background: var(--surface-raised);
+  background: var(--surface);
   border: 1px dashed var(--border);
-  border-radius: 6px;
+  border-radius: 2px;
   transition:
     border-color 120ms ease,
     background 120ms ease;
@@ -16,7 +16,7 @@
 
 .dropzone--active {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface-raised));
+  background: rgb(12 36 97 / 8%);
 }
 
 .dropzone--disabled {
@@ -24,29 +24,34 @@
 }
 
 .dropzone__lead {
-  font-size: 0.9375rem;
-  font-weight: 600;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--accent);
 }
 
 .dropzone__hint {
   font-size: 0.8125rem;
+  font-weight: 300;
   color: var(--text-muted);
 }
 
 .dropzone__button {
   margin-top: 0.5rem;
-  padding: 0.4375rem 0.875rem;
+  padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 500;
+  letter-spacing: 0.025em;
   color: var(--text);
-  background: var(--surface);
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 2px;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .dropzone__button:hover {
   border-color: var(--accent);
+  color: var(--accent);
 }
 
 .dropzone--disabled .dropzone__button {

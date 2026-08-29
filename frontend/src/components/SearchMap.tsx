@@ -31,7 +31,7 @@ export default function SearchMap({
   const pins = detections.filter(hasGeo)
 
   return (
-    <section className="card" aria-labelledby="map-heading">
+    <section className="card card--wide" aria-labelledby="map-heading">
       <h2 id="map-heading" className="card__title">
         Map
       </h2>
@@ -61,7 +61,7 @@ export default function SearchMap({
               className="search-map__frame"
               defaultCenter={{ lat: searchArea.lat, lng: searchArea.lng }}
               defaultZoom={13}
-              colorScheme={ColorScheme.DARK}
+              colorScheme={ColorScheme.LIGHT}
               gestureHandling="greedy"
               mapTypeId="roadmap"
               clickableIcons={false}
@@ -70,10 +70,10 @@ export default function SearchMap({
               <Circle
                 center={{ lat: searchArea.lat, lng: searchArea.lng }}
                 radius={searchArea.radius_m}
-                strokeColor="#4c9aff"
+                strokeColor="#0c2461"
                 strokeOpacity={0.9}
                 strokeWeight={2}
-                fillColor="#4c9aff"
+                fillColor="#0c2461"
                 fillOpacity={0.12}
                 clickable={false}
               />

@@ -5,9 +5,21 @@ import type { Sample } from '../types'
 interface SamplePickerProps {
   samples: Sample[]
   selectedId: string | null
-  /** Null when an upload owns the input slot; sample rows are then locked out. */
+  /** True when an upload owns the input slot; sample choice is then locked out. */
   disabled: boolean
-  onSelect: (sample: Sample) => void
+  onSelect: (sample: Sample | null) => void
+}
+
+function optionLabel(sample: Sample): string {
+  const scenario = SCENARIO_LABELS[sample.scenario] ?? sample.scenario
+  const parts = [
+    sample.label,
+    scenario,
+    `${sample.width} × ${sample.height} px`,
+    sample.terrain,
+  ]
+  if (sample.geo) parts.push('demo map tag')
+  return parts.join(' · ')
 }
 
 export default function SamplePicker({
@@ -25,41 +37,48 @@ export default function SamplePicker({
     )
   }
 
+  const selected = samples.find((sample) => sample.id === selectedId) ?? null
+
   return (
-    <ul className="samples" aria-label="Demo corpus samples">
-      {samples.map((sample) => {
-        const selected = sample.id === selectedId
-        return (
-          <li key={sample.id}>
-            <button
-              type="button"
-              className="sample"
-              aria-pressed={selected}
-              disabled={disabled}
-              onClick={() => onSelect(sample)}
+    <div className="samples">
+      <select
+        className="samples__select"
+        aria-label="Demo corpus samples"
+        disabled={disabled}
+        value={selectedId ?? ''}
+        onChange={(event) => {
+          const next = samples.find((sample) => sample.id === event.target.value) ?? null
+          onSelect(next)
+        }}
+      >
+        <option value="">Choose a sample…</option>
+        {samples.map((sample) => (
+          <option key={sample.id} value={sample.id}>
+            {optionLabel(sample)}
+          </option>
+        ))}
+      </select>
+
+      {selected && (
+        <div className="sample">
+          <div className="sample__head">
+            <span className="sample__label">{selected.label}</span>
+            <span
+              className={`badge badge--${selected.scenario}`}
+              title={`Scenario: ${SCENARIO_LABELS[selected.scenario] ?? selected.scenario}`}
             >
-              <span className="sample__head">
-                <span className="sample__label">{sample.label}</span>
-                <span
-                  className={`badge badge--${sample.scenario}`}
-                  title={`Scenario: ${SCENARIO_LABELS[sample.scenario] ?? sample.scenario}`}
-                >
-                  {SCENARIO_LABELS[sample.scenario] ?? sample.scenario}
-                </span>
-              </span>
-              <span className="sample__meta">
-                <span className="sample__dims">
-                  {sample.width} × {sample.height} px
-                </span>
-                <span className="sample__terrain">{sample.terrain}</span>
-                {sample.geo && (
-                  <span className="sample__geo">demo map tag</span>
-                )}
-              </span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
+              {SCENARIO_LABELS[selected.scenario] ?? selected.scenario}
+            </span>
+          </div>
+          <div className="sample__meta">
+            <span className="sample__dims">
+              {selected.width} × {selected.height} px
+            </span>
+            <span className="sample__terrain">{selected.terrain}</span>
+            {selected.geo && <span className="sample__geo">demo map tag</span>}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

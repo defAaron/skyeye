@@ -20,7 +20,7 @@
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  border-radius: 6px;
+  border-radius: 2px;
   cursor: pointer;
   transition:
     border-color 120ms ease,
@@ -34,9 +34,9 @@
 
 .candidate--active,
 .candidate:hover {
-  border-color: var(--pending);
-  border-left-color: var(--pending);
-  background: color-mix(in srgb, var(--pending) 12%, var(--surface-raised));
+  border-color: rgb(12 36 97 / 40%);
+  border-left-color: var(--accent-hover);
+  background: rgb(12 36 97 / 6%);
 }
 
 .candidate__rank {
@@ -45,11 +45,13 @@
   place-items: center;
   width: 1.5rem;
   height: 1.5rem;
-  border-radius: 4px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: rgb(12 36 97 / 8%);
+  border: 1px solid rgb(12 36 97 / 20%);
+  font-family: var(--display);
   font-size: 0.8125rem;
   font-weight: 700;
+  color: var(--accent);
 }
 
 .candidate__body {
@@ -62,6 +64,7 @@
 .candidate__headline {
   font-size: 0.9375rem;
   font-weight: 600;
+  color: var(--accent);
 }
 
 .candidate__raw {

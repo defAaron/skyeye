@@ -13,6 +13,26 @@ type HealthState =
   | { status: 'online'; health: HealthResponse }
   | { status: 'offline'; code: string; message: string }
 
+function LogoMark() {
+  return (
+    <div className="console-nav__logo">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        className="console-nav__logo-svg"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"
+        />
+      </svg>
+    </div>
+  )
+}
+
 export default function App() {
   const [health, setHealth] = useState<HealthState>({ status: 'loading' })
   const [searchArea, setSearchArea] = useState<GeocodeResponse | null>(null)
@@ -48,6 +68,10 @@ export default function App() {
 
   useEffect(() => {
     document.title = 'SkyEye — Detection console'
+    document.body.classList.add('console-body')
+    return () => {
+      document.body.classList.remove('console-body')
+    }
   }, [])
 
   const onResults = useCallback((result: DetectResponse | null) => {
@@ -68,24 +92,30 @@ export default function App() {
     health.status === 'online' ? health.health.extract?.configured ?? false : null
 
   return (
-    <>
-      <SafetyBanner />
+    <div className="console">
+      <div className="console-chrome">
+        <SafetyBanner />
 
-      <div className="page">
-        <header className="page__header">
+        <header className="console-nav">
+          <div className="console-nav__brand">
+            <LogoMark />
+            <h1 className="page__title">SkyEye</h1>
+          </div>
           <p className="page__eyebrow">
             <a className="page__back" href="/">
               ← SkyEye
             </a>
           </p>
-          <h1 className="page__title">SkyEye</h1>
-          <p className="page__subtitle">
-            Drone-altitude person detection — leads to verify, never confirmations.
-          </p>
         </header>
+      </div>
+
+      <div className="page">
+        <p className="page__subtitle">
+          Drone-altitude person detection — leads to verify, never confirmations.
+        </p>
 
         <main className="page__main">
-          <section className="card" aria-labelledby="honesty-heading">
+          <section className="card card--wide" aria-labelledby="honesty-heading">
             <h2 id="honesty-heading" className="card__title">
               What this actually runs on
             </h2>
@@ -99,7 +129,7 @@ export default function App() {
             </p>
           </section>
 
-          <section className="card" aria-labelledby="status-heading">
+          <section className="card card--wide" aria-labelledby="status-heading">
             <h2 id="status-heading" className="card__title">
               Backend status
             </h2>
@@ -117,7 +147,7 @@ export default function App() {
                   <span className="status__dot" aria-hidden="true" />
                   Backend online
                 </p>
-                <dl className="facts">
+                <dl className="facts facts--bento">
                   <div className="facts__row">
                     <dt>Version</dt>
                     <dd>{health.health.version}</dd>
@@ -211,6 +241,6 @@ export default function App() {
           />
         </main>
       </div>
-    </>
+    </div>
   )
 }

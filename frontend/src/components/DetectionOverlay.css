@@ -6,8 +6,8 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  background: #05070a;
-  border-radius: 6px;
+  background: var(--surface);
+  border-radius: 2px;
   /* Inset shadow rather than a border: a border would make aspect-ratio apply to the
      border box while the SVG fills the content box, shifting boxes by ~1 px. */
   box-shadow: inset 0 0 0 1px var(--border);
@@ -37,21 +37,21 @@
 }
 
 .box__rect {
-  fill: color-mix(in srgb, #4c9aff 12%, transparent);
-  stroke: #4c9aff;
+  fill: color-mix(in srgb, #0c2461 12%, transparent);
+  stroke: #0c2461;
   stroke-width: 2;
 }
 
 .box:hover .box__rect,
 .box--active .box__rect {
-  fill: color-mix(in srgb, #f5a524 22%, transparent);
-  stroke: #f5a524;
+  fill: color-mix(in srgb, #b45309 22%, transparent);
+  stroke: #b45309;
   stroke-width: 3;
 }
 
 .box__reticle {
   fill: none;
-  stroke: #f5a524;
+  stroke: #b45309;
   stroke-width: 1;
   stroke-dasharray: 6 5;
   opacity: 0.85;
@@ -61,15 +61,16 @@
   position: absolute;
   transform: translate(0, -100%);
   padding: 0 0.25rem;
+  font-family: var(--display);
   font-size: 0.6875rem;
   font-weight: 700;
   line-height: 1.35;
-  color: #05070a;
-  background: #4c9aff;
-  border-radius: 3px 3px 0 0;
+  color: #f5f0ea;
+  background: #0c2461;
+  border-radius: 2px 2px 0 0;
   pointer-events: none;
 }
 
 .overlay__tag--active {
-  background: #f5a524;
+  background: #b45309;
 }

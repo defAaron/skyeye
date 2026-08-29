@@ -140,9 +140,9 @@ export default function DetectPanel({
     }
   }, [onResults])
 
-  function chooseSample(sample: Sample) {
+  function chooseSample(sample: Sample | null) {
     setInputError(null)
-    setSelectedSample((current) => (current?.id === sample.id ? null : sample))
+    setSelectedSample(sample)
   }
 
   function acceptUpload(file: File) {
@@ -198,7 +198,7 @@ export default function DetectPanel({
 
   return (
     <>
-      <section className="card" aria-labelledby="detect-heading">
+      <section className="card card--wide" aria-labelledby="detect-heading">
         <h2 id="detect-heading" className="card__title">
           Detect
         </h2>
@@ -208,8 +208,9 @@ export default function DetectPanel({
           present.
         </p>
 
-        <div className="detect__group">
-          <h3 className="detect__legend">1 — Choose a sample from the demo corpus</h3>
+        <div className="detect__bento">
+          <div className="detect__group">
+            <h3 className="detect__legend">1 — Choose a sample from the demo corpus</h3>
           {samplesState.status === 'loading' && (
             <p className="card__hint">Loading the demo corpus…</p>
           )}
@@ -254,7 +255,7 @@ export default function DetectPanel({
           )}
         </div>
 
-        <div className="detect__group">
+        <div className="detect__group detect__group--run">
           <h3 className="detect__legend">3 — Set the confidence floor and run</h3>
 
           <div className="selection" aria-live="polite">
@@ -358,10 +359,11 @@ export default function DetectPanel({
             )}
           </div>
         </div>
+        </div>
       </section>
 
       {running && (
-        <section className="card" aria-labelledby="running-heading" aria-live="polite">
+        <section className="card card--wide" aria-labelledby="running-heading" aria-live="polite">
           <h2 id="running-heading" className="card__title">
             Running
           </h2>
@@ -382,7 +384,7 @@ export default function DetectPanel({
       )}
 
       {run.status === 'error' && errorCopy && (
-        <section className="card card--error" aria-labelledby="error-heading">
+        <section className="card card--wide card--error" aria-labelledby="error-heading">
           <h2 id="error-heading" className="card__title">
             Run did not complete
           </h2>
@@ -440,7 +442,7 @@ function ResultsCard({
   const sourceLink = safeHttpUrl(subject.sample?.source_url)
 
   return (
-    <section className="card" aria-labelledby="results-heading">
+    <section className="card card--wide" aria-labelledby="results-heading">
       <h2 id="results-heading" className="card__title">
         Candidates for review
       </h2>
