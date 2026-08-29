@@ -71,6 +71,10 @@
   height: 100%;
 }
 
+.search-map__auth {
+  margin: 0.75rem;
+}
+
 .button {
   display: inline-flex;
   align-items: center;

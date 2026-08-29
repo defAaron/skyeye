@@ -134,7 +134,7 @@ const COPY: Record<string, ErrorCopy> = {
   },
   NETWORK_ERROR: {
     title: 'The SkyEye backend could not be reached',
-    hint: 'Check that the API is running (locally on port 5001, or the Render service if this page is deployed), then try again.',
+    hint: 'Locally, start Flask on port 5001. On the live site, Render may have killed the API (status 137 is out of memory on first detect). Use a Standard / 2 GB instance, wait for a restart, then try again.',
     retryable: true,
   },
   BAD_RESPONSE: {

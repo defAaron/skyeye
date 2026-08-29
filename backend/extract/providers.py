@@ -15,7 +15,7 @@ from ratelimit import acquire_gemini, acquire_groq, trip_gemini_cooldown, trip_g
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT_SECONDS = 12
+TIMEOUT_SECONDS = 20
 USER_AGENT = "SkyEye/0.3 (RescueHacks SAR demo)"
 
 # Gemini 2.0 Flash retired June 2026. Prefer current free-tier Flash IDs
@@ -28,7 +28,9 @@ GEMINI_MODELS = (
     "gemini-flash-latest",
 )
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELS = ("llama-3.1-8b-instant", "llama-3.3-70b-versatile")
+# Llama 3.1 8B Instant and Llama 3.3 70B Versatile shut down 16 Aug 2026
+# for free/developer tiers. GPT-OSS is Groq's documented replacement.
+GROQ_MODELS = ("openai/gpt-oss-20b", "openai/gpt-oss-120b")
 
 SYSTEM_PROMPT = (
     "You extract structured facts from a missing-person report for a search-and-rescue "
@@ -148,6 +150,25 @@ def _parse_json_text(text: str) -> object:
     return json.loads(cleaned)
 
 
+def _choice_text(payload: dict) -> str:
+    """Groq/OpenAI chat content, including gpt-oss array-of-parts payloads."""
+    message = payload["choices"][0]["message"]
+    content = message.get("content")
+    if isinstance(content, list):
+        parts: list[str] = []
+        for part in content:
+            if isinstance(part, str) and part.strip():
+                parts.append(part)
+            elif isinstance(part, dict):
+                text = part.get("text")
+                if isinstance(text, str) and text.strip():
+                    parts.append(text)
+        content = "\n".join(parts)
+    if isinstance(content, str) and content.strip():
+        return content
+    raise TypeError("empty groq content")
+
+
 def _gemini_url(model: str) -> str:
     return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
@@ -173,7 +194,6 @@ def _gemini(report_text: str) -> dict:
                 "systemInstruction": {"parts": [{"text": SYSTEM_PROMPT}]},
                 "contents": [{"role": "user", "parts": [{"text": report_text}]}],
                 "generationConfig": {
-                    "temperature": 0.1,
                     "responseMimeType": "application/json",
                     "responseSchema": GEMINI_RESPONSE_SCHEMA,
                 },
@@ -257,7 +277,8 @@ def _groq(report_text: str) -> dict:
             {"Authorization": f"Bearer {key}"},
             {
                 "model": model,
-                "temperature": 0.1,
+                "reasoning_effort": "low",
+                "include_reasoning": False,
                 "response_format": {"type": "json_object"},
                 "messages": [
                     {
@@ -299,7 +320,7 @@ def _groq(report_text: str) -> dict:
             )
 
         try:
-            text = payload["choices"][0]["message"]["content"]
+            text = _choice_text(payload)
             parsed = _parse_json_text(text)
         except (KeyError, IndexError, TypeError, json.JSONDecodeError):
             raise ExtractProviderError(

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import './App.css'
-import { getHealth, SkyEyeApiError } from './api/client'
+import { apiBaseUrl, getHealth, SkyEyeApiError } from './api/client'
 import DetectPanel from './components/DetectPanel'
 import ReportIntake from './components/ReportIntake'
 import SafetyBanner from './components/SafetyBanner'
@@ -191,7 +191,9 @@ export default function App() {
                   <code className="code">{health.code}</code> — {health.message}
                 </p>
                 <p className="card__hint">
-                  Start the Flask backend on port 5001, then reload this page.
+                  {apiBaseUrl()
+                    ? 'The Render API did not respond. Status 137 is an out-of-memory kill — the service needs Standard / 2 GB, then a restart. Reload this page after it is up.'
+                    : 'Start the Flask backend on port 5001, then reload this page.'}
                 </p>
               </>
             )}

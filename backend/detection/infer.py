@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import logging
 import math
 import sys
+import threading
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Any
@@ -21,12 +23,20 @@ from detection.types import Detection
 
 logger = logging.getLogger(__name__)
 
-# Tiles per model call. Keeps a 4000x3000 image at a handful of 640px crops in RAM
-# instead of the whole grid, which matters on a laptop CPU.
-TILE_BATCH_SIZE = 8
+# One detect at a time. Concurrent YOLO forwards on gthread workers double RSS
+# and are the usual status-137 on a 2 GB Render box.
+_infer_lock = threading.RLock()
+
+# Tiles per model call. Default 1 (see TILE_BATCH_SIZE) so a 2 GB instance
+# does not hold eight 640px crops plus activations at once.
+MAX_TILE_BATCH_SIZE = 8
 
 # YOLOv8's native input size.
 MODEL_IMGSZ = 640
+
+
+def _tile_batch_size() -> int:
+    return max(1, min(MAX_TILE_BATCH_SIZE, int(settings.tile_batch_size)))
 
 
 def _infer_imgsz() -> int:
@@ -123,21 +133,22 @@ def detect_full_image(image: Image.Image, conf: float) -> list[Detection]:
     Fast, but a large aerial is letterboxed down to the network input size, which
     shrinks distant people below what the detector can see. Use `detect_image` for those.
     """
-    image = _as_rgb(image)
-    model = get_model()
-    class_ids = _target_class_ids(model)
-    if not class_ids:
-        logger.warning("weights %s expose no person class; returning no detections", settings.weights)
-        return []
+    with _infer_lock:
+        image = _as_rgb(image)
+        model = get_model()
+        class_ids = _target_class_ids(model)
+        if not class_ids:
+            logger.warning("weights %s expose no person class; returning no detections", settings.weights)
+            return []
 
-    results = _predict(model, [image], conf, class_ids)
-    allowed = set(class_ids)
-    detections: list[Detection] = []
-    for result in results:
-        detections.extend(
-            _detections_from_result(result, allowed, 0, 0, image.width, image.height)
-        )
-    return _sorted_desc(detections)
+        results = _predict(model, [image], conf, class_ids)
+        allowed = set(class_ids)
+        detections: list[Detection] = []
+        for result in results:
+            detections.extend(
+                _detections_from_result(result, allowed, 0, 0, image.width, image.height)
+            )
+        return _sorted_desc(detections)
 
 
 def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]:
@@ -149,42 +160,44 @@ def detect_image(image: Image.Image, conf: float) -> tuple[list[Detection], int]
 
     Callers are expected to have already enforced `settings.max_image_pixels`.
     """
-    image = _as_rgb(image)
-    grid = tile_grid(image.width, image.height)
-    tiles = len(grid)
+    with _infer_lock:
+        image = _as_rgb(image)
+        grid = tile_grid(image.width, image.height)
+        tiles = len(grid)
 
-    if tiles <= 1:
-        return detect_full_image(image, conf), max(tiles, 1)
+        if tiles <= 1:
+            return detect_full_image(image, conf), max(tiles, 1)
 
-    model = get_model()
-    class_ids = _target_class_ids(model)
-    if not class_ids:
-        logger.warning("weights %s expose no person class; returning no detections", settings.weights)
-        return [], tiles
+        model = get_model()
+        class_ids = _target_class_ids(model)
+        if not class_ids:
+            logger.warning("weights %s expose no person class; returning no detections", settings.weights)
+            return [], tiles
 
-    allowed = set(class_ids)
-    raw: list[Detection] = []
-    for batch in _batched(iter_tiles(image), TILE_BATCH_SIZE):
-        results = _predict(model, [tile.image for tile in batch], conf, class_ids)
-        for tile, result in zip(batch, results):
-            raw.extend(
-                _detections_from_result(
-                    result, allowed, tile.offset_x, tile.offset_y, image.width, image.height
+        allowed = set(class_ids)
+        raw: list[Detection] = []
+        for batch in _batched(iter_tiles(image), _tile_batch_size()):
+            results = _predict(model, [tile.image for tile in batch], conf, class_ids)
+            for tile, result in zip(batch, results):
+                raw.extend(
+                    _detections_from_result(
+                        result, allowed, tile.offset_x, tile.offset_y, image.width, image.height
+                    )
                 )
-            )
-        del results, batch
+            del results, batch
+            gc.collect()
 
-    merged = _sorted_desc(merge_detections(raw))
-    logger.info(
-        "tiled detect %dx%d tiles=%d raw=%d merged=%d conf=%.2f",
-        image.width,
-        image.height,
-        tiles,
-        len(raw),
-        len(merged),
-        conf,
-    )
-    return merged, tiles
+        merged = _sorted_desc(merge_detections(raw))
+        logger.info(
+            "tiled detect %dx%d tiles=%d raw=%d merged=%d conf=%.2f",
+            image.width,
+            image.height,
+            tiles,
+            len(raw),
+            len(merged),
+            conf,
+        )
+        return merged, tiles
 
 
 def detections_payload(detections: Sequence[Detection]) -> list[dict[str, Any]]:

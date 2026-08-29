@@ -11,7 +11,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     YOLO_DEVICE=cpu \
     YOLO_WEIGHTS=/app/yolov8n.pt \
     YOLO_CONFIG_DIR=/tmp/Ultralytics \
-    MPLCONFIGDIR=/tmp/matplotlib
+    MPLCONFIGDIR=/tmp/matplotlib \
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    NUMEXPR_NUM_THREADS=1 \
+    MALLOC_ARENA_MAX=2
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libgomp1 \

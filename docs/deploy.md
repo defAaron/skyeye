@@ -14,7 +14,9 @@ seconds (the client already waits up to 180s).
 | Geocoding + Gemini/Groq keys | Render env | Server-side only. Never put these on Vercel |
 
 **512 MB plans will OOM.** Free and Starter are 512 MB. PyTorch + YOLOv8n need
-about 2 GB. If detect is still slow after deploy, bump to Pro / 2c-4g.
+about 2 GB. Render emails **Exited with status 137** when the Linux OOM killer
+SIGKILLs gunicorn on first detect — health and geocode still work until that
+load. If detect is still slow after deploy, bump to Pro / 2c-4g.
 
 Render's free instance also spins down. A cold start then downloads nothing
 (weights and fixtures are baked into the image) but the first detect still
@@ -73,7 +75,10 @@ proxying `/api` to `http://127.0.0.1:5001`.
 After both URLs exist:
 
 - **Browser key** (`VITE_GOOGLE_MAPS_API_KEY`): HTTP referrers
-  `http://localhost:5173/*` and `https://YOUR-VERCEL-DOMAIN/*`.
+  `http://localhost:5173/*` and `https://YOUR-VERCEL-DOMAIN/*` (the trailing
+  `/*` is required). Enable **Maps JavaScript API** and billing. A key that
+  only allows Geocoding will geocode from Render and still show Google's
+  "This page didn't load Google Maps correctly" overlay in the browser.
 - **Server key** (`GOOGLE_MAPS_API_KEY` on Render): restrict to the Geocoding
   API. IP restriction is optional; Render egress IPs are not fixed on every plan.
 
