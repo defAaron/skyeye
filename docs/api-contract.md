@@ -310,7 +310,7 @@ Response rules:
 - `provider` is `"gemini"` or `"groq"` — which model produced the JSON. Never a key.
 - `disclaimer` is always present. Clients must display it. Extracted fields are not verified facts.
 
-Provider order: Gemini Flash first (`gemini-flash-latest`, then `gemini-3.5-flash`, then `gemini-3.1-flash-lite`); Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, locally rate-limited, or fails. Neither key appears in the response. The report body is never logged.
+Provider order: Gemini Flash first (`gemini-3.6-flash`, `gemini-3.5-flash-lite`, `gemini-3.5-flash`, `gemini-3.1-flash-lite`, then `gemini-flash-latest`); Groq Llama 3.1 8B Instant if Gemini is unset, quota-limited, locally rate-limited, or fails. Neither key appears in the response. The report body is never logged.
 
 ### Rate limits
 

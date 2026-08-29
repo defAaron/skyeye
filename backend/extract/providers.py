@@ -18,9 +18,15 @@ logger = logging.getLogger(__name__)
 TIMEOUT_SECONDS = 12
 USER_AGENT = "SkyEye/0.3 (RescueHacks SAR demo)"
 
-# Gemini 2.0 Flash (and 2.5 Flash on many keys) retired June 2026.
-# Try the moving alias first, then the documented 3.x Flash replacements.
-GEMINI_MODELS = ("gemini-flash-latest", "gemini-3.5-flash", "gemini-3.1-flash-lite")
+# Gemini 2.0 Flash retired June 2026. Prefer current free-tier Flash IDs
+# (AI Studio pricing as of Aug 2026), then the moving alias.
+GEMINI_MODELS = (
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-flash-latest",
+)
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODELS = ("llama-3.1-8b-instant", "llama-3.3-70b-versatile")
 
@@ -86,7 +92,23 @@ def _ssl_context() -> ssl.SSLContext:
     return ssl.create_default_context(cafile=certifi.where())
 
 
-def _post_json(url: str, headers: dict[str, str], payload: dict) -> tuple[int, dict | None]:
+def _provider_error_reason(payload: dict | None) -> str:
+    """Safe Google/Groq error token for logs. Never the message — it can echo a key."""
+    if not isinstance(payload, dict):
+        return "unknown"
+    err = payload.get("error")
+    if not isinstance(err, dict):
+        return "unknown"
+    status = err.get("status")
+    if isinstance(status, str) and status.replace("_", "").isalnum():
+        return status
+    code = err.get("code")
+    if isinstance(code, int):
+        return str(code)
+    return "unknown"
+
+
+def _post_json(url: str, headers: dict[str, str], payload: dict) -> tuple[int, dict | None, str]:
     body = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         url,
@@ -104,16 +126,16 @@ def _post_json(url: str, headers: dict[str, str], payload: dict) -> tuple[int, d
             request, timeout=TIMEOUT_SECONDS, context=_ssl_context()
         ) as response:
             raw = response.read().decode("utf-8")
-            return response.status, json.loads(raw)
+            return response.status, json.loads(raw), "ok"
     except urllib.error.HTTPError as exc:
+        parsed: dict | None
         try:
-            json.loads(exc.read().decode("utf-8"))
+            parsed = json.loads(exc.read().decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError, TypeError):
-            pass
-        # Body is discarded: provider error_message can echo the API key.
-        return exc.code, None
+            parsed = None
+        return exc.code, None, _provider_error_reason(parsed)
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError):
-        return 0, None
+        return 0, None, "unreachable"
 
 
 def _parse_json_text(text: str) -> object:
@@ -144,7 +166,7 @@ def _gemini(report_text: str) -> dict:
                 "The primary extraction provider is at its local rate limit.",
                 retry_after=retry_after,
             )
-        status, payload = _post_json(
+        status, payload, reason = _post_json(
             _gemini_url(model),
             {"x-goog-api-key": key},
             {
@@ -159,7 +181,12 @@ def _gemini(report_text: str) -> dict:
         )
         last_status = status
         if status in {400, 404}:
-            logger.warning("extract gemini model rejected model=%s status=%s", model, status)
+            logger.warning(
+                "extract gemini model rejected model=%s status=%s reason=%s",
+                model,
+                status,
+                reason,
+            )
             continue
         if status in {401, 403}:
             raise ExtractProviderError(
@@ -171,7 +198,9 @@ def _gemini(report_text: str) -> dict:
             # Per-model free-tier exhaustion is common; try the next id before
             # treating the whole key as spent.
             saw_quota = True
-            logger.warning("extract gemini model at quota model=%s", model)
+            logger.warning(
+                "extract gemini model at quota model=%s reason=%s", model, reason
+            )
             continue
         if status != 200 or not isinstance(payload, dict):
             raise ExtractProviderError(
@@ -223,7 +252,7 @@ def _groq(report_text: str) -> dict:
                 "The fallback extraction provider is at its local rate limit.",
                 retry_after=retry_after,
             )
-        status, payload = _post_json(
+        status, payload, reason = _post_json(
             GROQ_URL,
             {"Authorization": f"Bearer {key}"},
             {
@@ -241,7 +270,12 @@ def _groq(report_text: str) -> dict:
         )
         last_status = status
         if status in {400, 404}:
-            logger.warning("extract groq model rejected status=%s", status)
+            logger.warning(
+                "extract groq model rejected model=%s status=%s reason=%s",
+                model,
+                status,
+                reason,
+            )
             continue
         if status in {401, 403}:
             raise ExtractProviderError(

@@ -15,7 +15,7 @@ MANIFEST_PATH = FIXTURES_DIR / "manifest.json"
 
 VERSION = "0.3.0"
 
-load_dotenv(BACKEND_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env", override=True)
 
 
 def _int(name: str, default: int) -> int:
