@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SkyEye — How a lead is made</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f5f0ea;
+        --fg: #1c1b19;
+        --muted: #6a655f;
+        --line: #cfc8bc;
+        --navy: #0c2461;
+        --navy-soft: #1e3a8a;
+        --card: #fffcf7;
+        --on-navy: #f5f0ea;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html,
+      body {
+        background: #1a1914;
+        color: var(--fg);
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      .stage {
+        width: 1920px;
+        height: 1080px;
+        margin: 0 auto;
+        padding: 48px 72px 40px;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stage::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(var(--line) 0.7px, transparent 0.7px);
+        background-size: 22px 22px;
+        opacity: 0.35;
+        pointer-events: none;
+      }
+
+      .content {
+        position: relative;
+        z-index: 1;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 36px;
+      }
+
+      .kicker {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.28em;
+        text-transform: uppercase;
+        color: var(--navy);
+        margin-bottom: 8px;
+      }
+
+      h1 {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 72px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        line-height: 0.88;
+        text-transform: uppercase;
+        color: var(--navy);
+      }
+
+      .meta {
+        text-align: right;
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--muted);
+        max-width: 380px;
+      }
+
+      .meta b {
+        display: block;
+        font-weight: 600;
+        color: var(--navy);
+        margin-bottom: 2px;
+      }
+
+      .flow {
+        flex: 1;
+        display: grid;
+        grid-template-rows: auto 28px auto 28px auto;
+        align-items: stretch;
+      }
+
+      .row {
+        display: flex;
+        justify-content: center;
+        gap: 28px;
+      }
+
+      .row--split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 48px;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1.5px solid var(--navy);
+        border-radius: 2px;
+        padding: 22px 26px 20px;
+        min-width: 0;
+      }
+
+      .card--wide {
+        width: 920px;
+      }
+
+      .card--lane {
+        min-height: 268px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .lane-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 18px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .lane-head h2 {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--navy);
+      }
+
+      .lane-head span {
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .num {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        color: var(--navy);
+        margin-bottom: 6px;
+      }
+
+      h3 {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        margin-bottom: 8px;
+      }
+
+      p {
+        font-size: 15px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+
+      code {
+        font-family: Inter, sans-serif;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: var(--navy-soft);
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: 1fr 36px 1fr;
+        gap: 0;
+        align-items: start;
+        flex: 1;
+      }
+
+      .mini-arrow {
+        align-self: center;
+        height: 1.5px;
+        background: var(--navy);
+        position: relative;
+      }
+
+      .mini-arrow::after {
+        content: "";
+        position: absolute;
+        right: -1px;
+        top: -4px;
+        width: 8px;
+        height: 8px;
+        border-right: 1.5px solid var(--navy);
+        border-bottom: 1.5px solid var(--navy);
+        transform: rotate(-45deg);
+      }
+
+      .v-join {
+        display: flex;
+        justify-content: stretch;
+        align-items: center;
+      }
+
+      .v-join svg {
+        width: 100%;
+        height: 28px;
+        display: block;
+      }
+
+      .fuse {
+        background: var(--navy);
+        color: var(--on-navy);
+        padding: 26px 36px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 32px;
+      }
+
+      .fuse h2 {
+        font-family: "Barlow Condensed", sans-serif;
+        font-size: 30px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+      }
+
+      .fuse p {
+        color: rgb(245 240 234 / 82%);
+        font-size: 15px;
+        max-width: 980px;
+      }
+
+      .pills {
+        display: flex;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      .pill {
+        border: 1px solid rgb(245 240 234 / 30%);
+        padding: 8px 12px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      footer {
+        margin-top: 20px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="content">
+        <header>
+          <div>
+            <p class="kicker">SkyEye · RescueHacks</p>
+            <h1>How a lead is made</h1>
+          </div>
+          <p class="meta">
+            <b>Two questions, fused at the end</b>
+            Where to look is a map problem. What to look at is a drone photograph. Satellite tiles never enter the detector.
+          </p>
+        </header>
+
+        <div class="flow">
+          <div class="row">
+            <article class="card card--wide">
+              <p class="num">01 — 02</p>
+              <h3>Report → structured extract</h3>
+              <p>
+                Free-text missing-person report.
+                <code>POST /api/extract</code>
+                · Gemini Flash primary, Groq Llama 3.1 Instant fallback. Last-known place, elapsed hours, subject category, clothing — a starting point to review, not verified facts.
+              </p>
+            </article>
+          </div>
+
+          <div class="v-join">
+            <svg viewBox="0 0 1776 28" fill="none" aria-hidden="true">
+              <path d="M888 0 V10" stroke="#0c2461" stroke-width="1.5" />
+              <path d="M432 10 H1344" stroke="#0c2461" stroke-width="1.5" />
+              <path d="M432 10 V28 M1344 10 V28" stroke="#0c2461" stroke-width="1.5" />
+            </svg>
+          </div>
+
+          <div class="row--split">
+            <article class="card card--lane">
+              <div class="lane-head">
+                <h2>Where to look</h2>
+                <span>Map · never scanned</span>
+              </div>
+              <div class="steps">
+                <div>
+                  <p class="num">03</p>
+                  <h3>Geocode</h3>
+                  <p>
+                    <code>POST /api/geocode</code>
+                    <br />
+                    Last-known text → lat/lng via Google Geocoding. Display layer only.
+                  </p>
+                </div>
+                <div class="mini-arrow"></div>
+                <div>
+                  <p class="num">04</p>
+                  <h3>LPB ring</h3>
+                  <p>
+                    Simplified Koester 50th-percentile radius, scaled with elapsed time. Heuristic, not an operational plan.
+                  </p>
+                </div>
+              </div>
+            </article>
+
+            <article class="card card--lane">
+              <div class="lane-head">
+                <h2>What to look at</h2>
+                <span>Drone-altitude only</span>
+              </div>
+              <div class="steps">
+                <div>
+                  <p class="num">05</p>
+                  <h3>Photograph</h3>
+                  <p>
+                    Nadir JPEG/PNG. A person is 1–2 pixels on commercial satellite. Those tiles are never detector input.
+                  </p>
+                </div>
+                <div class="mini-arrow"></div>
+                <div>
+                  <p class="num">06</p>
+                  <h3>Tiled YOLO</h3>
+                  <p>
+                    <code>POST /api/detect</code>
+                    <br />
+                    Sliding windows · person class · IoU merge across seams · ranked by confidence.
+                  </p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="v-join">
+            <svg viewBox="0 0 1776 28" fill="none" aria-hidden="true">
+              <path d="M432 0 V16 M1344 0 V16" stroke="#0c2461" stroke-width="1.5" />
+              <path d="M432 16 H1344" stroke="#0c2461" stroke-width="1.5" />
+              <path d="M888 16 V28" stroke="#0c2461" stroke-width="1.5" />
+            </svg>
+          </div>
+
+          <div class="fuse">
+            <div>
+              <h2>07 · Ranked leads · a human verifies</h2>
+              <p>
+                Pixel boxes on the image, pins on the ring when the sample is georeferenced. Confidence always shown. Zero results are never “the area is clear.” Contact 911 / local SAR immediately.
+              </p>
+            </div>
+            <div class="pills">
+              <span class="pill">React</span>
+              <span class="pill">Flask</span>
+              <span class="pill">YOLOv8n</span>
+            </div>
+          </div>
+        </div>
+
+        <footer>
+          <span>Keys stay on the server · Vercel UI · Render API</span>
+          <span>Leads to verify · never confirmations</span>
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
